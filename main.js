@@ -9,7 +9,6 @@ let pixR = window.devicePixelRatio ? window.devicePixelRatio : 1;
 let sun;
 let sunGlow;
 let sunCorona;
-let solarFlares;
 let planets = [];
 let orbits = [];
 let sceneOffsetTarget = {x: 0, y: 0};
@@ -108,7 +107,7 @@ else
 			size: 2,
 			sizeAttenuation: true,
 			transparent: true,
-			opacity: 0.8,
+			opacity: 1,
 			blending: t.AdditiveBlending
 		});
 		
@@ -341,7 +340,7 @@ else
 		const material = new t.LineBasicMaterial({
 			color: color,
 			transparent: true,
-			opacity: 0.3
+			opacity: 1
 		});
 		
 		return new t.Line(geometry, material);
@@ -471,7 +470,7 @@ else
 			const atmosphereMaterial = new t.MeshPhongMaterial({
 				color: 0xFFDD88,
 				transparent: true,
-				opacity: 0.5,
+				opacity: 1,
 				side: t.BackSide
 			});
 			const atmosphere = new t.Mesh(atmosphereGeometry, atmosphereMaterial);
@@ -487,7 +486,7 @@ else
 				emissive: 0xEEEEEE,
 				emissiveIntensity: 0.1,
 				transparent: true,
-				opacity: 0.9
+				opacity: 1
 			});
 			const northCap = new t.Mesh(northCapGeometry, iceMaterial);
 			northCap.scale.set(0.3, 0.2, 0.3);
@@ -507,7 +506,7 @@ else
 			const atmosphereMaterial = new t.MeshPhongMaterial({
 				color: 0x88CCFF,
 				transparent: true,
-				opacity: 0.3,
+				opacity: 1,
 				side: t.BackSide
 			});
 			const atmosphere = new t.Mesh(atmosphereGeometry, atmosphereMaterial);
@@ -530,7 +529,7 @@ else
 				);
 				
 				// Vary opacity and color for each ring layer
-				const opacity = planetInfo.name === "Saturn" ? 0.8 - (i * 0.1) : 0.6 - (i * 0.1);
+				const opacity = 1;
 				const ringMaterial = new t.MeshPhongMaterial({
 					color: planetInfo.ringColor,
 					side: t.DoubleSide,
@@ -559,7 +558,7 @@ else
 				emissive: 0x661111,
 				emissiveIntensity: 0.2,
 				transparent: true,
-				opacity: 0.6
+				opacity: 1
 			});
 			const spot = new t.Mesh(spotGeometry, spotMaterial);
 			spot.scale.set(0.4, 0.25, 0.4); // Elliptical shape
@@ -572,7 +571,7 @@ else
 				const cloudMaterial = new t.MeshPhongMaterial({
 					color: 0xEEBB88,
 					transparent: true,
-					opacity: 0.2 - (i * 0.05)
+					opacity: 1
 				});
 				const cloud = new t.Mesh(cloudGeometry, cloudMaterial);
 				cloud.scale.set(0.2 + i * 0.1, 0.15 + i * 0.05, 0.2 + i * 0.1);
@@ -639,7 +638,7 @@ else
 		const glowMaterial = new t.MeshBasicMaterial({
 			color: 0xFFAA00,
 			transparent: true,
-			opacity: 0.4,
+			opacity: 1,
 			side: t.BackSide
 		});
 		sunGlow = new t.Mesh(glowGeometry, glowMaterial);
@@ -650,61 +649,18 @@ else
 		const coronaMaterial = new t.MeshBasicMaterial({
 			color: 0xFF6600,
 			transparent: true,
-			opacity: 0.2,
+			opacity: 1,
 			side: t.BackSide
 		});
 		sunCorona = new t.Mesh(coronaGeometry, coronaMaterial);
 		// Position will be set in updateSolarSystem
 		
-		// Create solar flares particle system
-		// Reduce particle count based on number of windows for performance
-		const windowCount = windowManager ? windowManager.getWindows().length : 1;
-		const flareCount = Math.max(200, 1000 - (windowCount * 100));
-		const flareGeometry = new t.BufferGeometry();
-		const flarePositions = new Float32Array(flareCount * 3);
-		const flareVelocities = new Float32Array(flareCount * 3);
-		const flareLifetimes = new Float32Array(flareCount);
-		
-		for (let i = 0; i < flareCount; i++) {
-			// Start at sun surface
-			const theta = Math.random() * Math.PI * 2;
-			const phi = Math.acos(2 * Math.random() - 1);
-			const r = 40;
-			
-			// Start positions relative to origin, will be positioned with sun later
-			flarePositions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-			flarePositions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-			flarePositions[i * 3 + 2] = r * Math.cos(phi);
-			
-			// Outward velocity
-			flareVelocities[i * 3] = flarePositions[i * 3] / r * (10 + Math.random() * 20);
-			flareVelocities[i * 3 + 1] = flarePositions[i * 3 + 1] / r * (10 + Math.random() * 20);
-			flareVelocities[i * 3 + 2] = flarePositions[i * 3 + 2] / r * (10 + Math.random() * 20);
-			
-			flareLifetimes[i] = Math.random();
-		}
-		
-		flareGeometry.setAttribute('position', new t.BufferAttribute(flarePositions, 3));
-		flareGeometry.setAttribute('velocity', new t.BufferAttribute(flareVelocities, 3));
-		flareGeometry.setAttribute('lifetime', new t.BufferAttribute(flareLifetimes, 1));
-		
-		const flareMaterial = new t.PointsMaterial({
-			color: 0xFFEE00,
-			size: 3,
-			transparent: true,
-			opacity: 0.8,
-			blending: t.AdditiveBlending,
-			vertexColors: false
-		});
-		
-		solarFlares = new t.Points(flareGeometry, flareMaterial);
-		// Solar flares positions are already set in the vertex data
+		// Solar flares removed for cleaner visual
 		
 		// Add all to world
 		world.add(sunCorona);
 		world.add(sunGlow);
 		world.add(sun);
-		world.add(solarFlares);
 	}
 
 	function updateSolarSystem ()
@@ -716,11 +672,9 @@ else
 			world.remove(sun);
 			world.remove(sunGlow);
 			world.remove(sunCorona);
-			world.remove(solarFlares);
 			sun = null;
 			sunGlow = null;
 			sunCorona = null;
-			solarFlares = null;
 		}
 		
 		// Remove all planets
@@ -751,8 +705,6 @@ else
 			sunGlow.position.y = sunY;
 			sunCorona.position.x = sunX;
 			sunCorona.position.y = sunY;
-			solarFlares.position.x = sunX;
-			solarFlares.position.y = sunY;
 			
 			// Update sun light position
 			if (scene.userData.sunLight) {
@@ -773,7 +725,7 @@ else
 				
 				// Calculate initial position on orbit
 				// Use a consistent starting angle based on current time for sync across windows
-				const baseAngle = (getTime() * 0.01) / planetInfo.orbitalPeriod;
+				const baseAngle = (getTime() * 0.03) / planetInfo.orbitalPeriod;
 				planet.userData.angle = baseAngle % (Math.PI * 2);
 				
 				const angle = planet.userData.angle;
@@ -838,8 +790,6 @@ else
 			sunGlow.position.y = sun.position.y;
 			sunCorona.position.x = sun.position.x;
 			sunCorona.position.y = sun.position.y;
-			solarFlares.position.x = sun.position.x;
-			solarFlares.position.y = sun.position.y;
 			
 			// Update sun light position
 			if (scene.userData.sunLight) {
@@ -856,58 +806,11 @@ else
 			
 			let glowPulse = Math.sin(t * 3) * 0.1 + 1.1;
 			sunGlow.scale.set(glowPulse, glowPulse, glowPulse);
-			sunGlow.material.opacity = 0.4 + Math.sin(t * 4) * 0.1;
+			sunGlow.material.opacity = 1;
 			
 			let coronaPulse = Math.sin(t * 2.5) * 0.15 + 1.15;
 			sunCorona.scale.set(coronaPulse, coronaPulse, coronaPulse);
-			sunCorona.material.opacity = 0.2 + Math.sin(t * 3.5) * 0.05;
-			
-			// Animate solar flares
-			let flarePositions = solarFlares.geometry.attributes.position.array;
-			let flareVelocities = solarFlares.geometry.attributes.velocity.array;
-			let flareLifetimes = solarFlares.geometry.attributes.lifetime.array;
-			
-			for (let i = 0; i < flarePositions.length / 3; i++) {
-				let idx = i * 3;
-				
-				// Update positions
-				flarePositions[idx] += flareVelocities[idx] * 0.5;
-				flarePositions[idx + 1] += flareVelocities[idx + 1] * 0.5;
-				flarePositions[idx + 2] += flareVelocities[idx + 2] * 0.5;
-				
-				// Update lifetime
-				flareLifetimes[i] -= 0.01;
-				
-				// Reset if lifetime expired or too far from sun center (0,0,0 since particles are in sun's local space)
-				let dx = flarePositions[idx];
-				let dy = flarePositions[idx + 1];
-				let dz = flarePositions[idx + 2];
-				let distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
-				
-				if (flareLifetimes[i] <= 0 || distance > 150) {
-					// Reset to sun surface
-					let theta = Math.random() * Math.PI * 2;
-					let phi = Math.acos(2 * Math.random() - 1);
-					let r = 40;
-					
-					flarePositions[idx] = r * Math.sin(phi) * Math.cos(theta);
-					flarePositions[idx + 1] = r * Math.sin(phi) * Math.sin(theta);
-					flarePositions[idx + 2] = r * Math.cos(phi);
-					
-					// New velocity
-					flareVelocities[idx] = flarePositions[idx] / r * (10 + Math.random() * 20);
-					flareVelocities[idx + 1] = flarePositions[idx + 1] / r * (10 + Math.random() * 20);
-					flareVelocities[idx + 2] = flarePositions[idx + 2] / r * (10 + Math.random() * 20);
-					
-					flareLifetimes[i] = 1.0;
-				}
-			}
-			
-			solarFlares.geometry.attributes.position.needsUpdate = true;
-			solarFlares.geometry.attributes.lifetime.needsUpdate = true;
-			
-			// Rotate flares system
-			solarFlares.rotation.y = t * 0.02;
+			sunCorona.material.opacity = 1;
 			
 			// Update orbit positions to follow sun's current position
 			orbits.forEach((orbit) => {
@@ -920,7 +823,7 @@ else
 				const planetInfo = planetData[index];
 				
 				// Use time-based angle for perfect sync across windows
-				const baseAngle = (getTime() * 0.01) / planetInfo.orbitalPeriod;
+				const baseAngle = (getTime() * 0.03) / planetInfo.orbitalPeriod;
 				planet.userData.angle = baseAngle % (Math.PI * 2);
 
 				
