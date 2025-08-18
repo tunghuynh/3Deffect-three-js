@@ -429,7 +429,7 @@ else
 			emissiveIntensity: 1
 		});
 		sun = new t.Mesh(sunGeometry, sunMaterial);
-		sun.position.set(0, 0, 0);
+		// Position will be set in updateSolarSystem
 		
 		// Create sun glow
 		const glowGeometry = new t.SphereGeometry(80, 32, 32);
@@ -440,7 +440,7 @@ else
 			side: t.BackSide
 		});
 		sunGlow = new t.Mesh(glowGeometry, glowMaterial);
-		sunGlow.position.copy(sun.position);
+		// Position will be set in updateSolarSystem
 		
 		// Create corona effect
 		const coronaGeometry = new t.SphereGeometry(100, 32, 32);
@@ -451,7 +451,7 @@ else
 			side: t.BackSide
 		});
 		sunCorona = new t.Mesh(coronaGeometry, coronaMaterial);
-		sunCorona.position.copy(sun.position);
+		// Position will be set in updateSolarSystem
 		
 		// Create solar flares particle system
 		// Reduce particle count based on number of windows for performance
@@ -468,13 +468,17 @@ else
 			const phi = Math.acos(2 * Math.random() - 1);
 			const r = 60;
 			
-			flarePositions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-			flarePositions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+			// Use fixed sun position
+			const fixedSunX = window.screen.width / 2;
+			const fixedSunY = window.screen.height / 2;
+			
+			flarePositions[i * 3] = r * Math.sin(phi) * Math.cos(theta) + fixedSunX;
+			flarePositions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta) + fixedSunY;
 			flarePositions[i * 3 + 2] = r * Math.cos(phi);
 			
 			// Outward velocity
-			flareVelocities[i * 3] = flarePositions[i * 3] / r * (10 + Math.random() * 20);
-			flareVelocities[i * 3 + 1] = flarePositions[i * 3 + 1] / r * (10 + Math.random() * 20);
+			flareVelocities[i * 3] = (flarePositions[i * 3] - fixedSunX) / r * (10 + Math.random() * 20);
+			flareVelocities[i * 3 + 1] = (flarePositions[i * 3 + 1] - fixedSunY) / r * (10 + Math.random() * 20);
 			flareVelocities[i * 3 + 2] = flarePositions[i * 3 + 2] / r * (10 + Math.random() * 20);
 			
 			flareLifetimes[i] = Math.random();
@@ -494,7 +498,7 @@ else
 		});
 		
 		solarFlares = new t.Points(flareGeometry, flareMaterial);
-		solarFlares.position.copy(sun.position);
+		// Solar flares positions are already set in the vertex data
 		
 		// Add all to world
 		world.add(sunCorona);
@@ -536,10 +540,10 @@ else
 			createSun();
 			createOrbits();
 			
-			// Position sun at the center of the first window
-			let firstWin = wins[0];
-			let sunX = firstWin.shape.x + (firstWin.shape.w * .5);
-			let sunY = firstWin.shape.y + (firstWin.shape.h * .5);
+			// Use a fixed absolute position for sun that's consistent across all windows
+			// Position at the center of the screen
+			let sunX = window.screen.width / 2;
+			let sunY = window.screen.height / 2;
 			
 			sun.position.x = sunX;
 			sun.position.y = sunY;
@@ -547,8 +551,7 @@ else
 			sunGlow.position.y = sunY;
 			sunCorona.position.x = sunX;
 			sunCorona.position.y = sunY;
-			solarFlares.position.x = sunX;
-			solarFlares.position.y = sunY;
+			// solarFlares positions are in vertex data, no need to set position
 			
 			// Position orbits at sun position
 			orbits.forEach((orbit) => {
@@ -563,15 +566,19 @@ else
 				
 				// Calculate initial position on orbit
 				// Use a consistent starting angle based on current time for sync across windows
-				const baseAngle = (getTime() * 0.1) / planetInfo.orbitalPeriod;
+				const baseAngle = (getTime() * 0.002) / planetInfo.orbitalPeriod;
 				planet.userData.angle = baseAngle % (Math.PI * 2);
 				
 				const angle = planet.userData.angle;
 				const semiMajorAxis = planetInfo.semiMajorAxis;
 				const semiMinorAxis = semiMajorAxis * Math.sqrt(1 - planetInfo.eccentricity * planetInfo.eccentricity);
 				
-				planet.position.x = sunX + semiMajorAxis * Math.cos(angle);
-				planet.position.y = sunY + semiMinorAxis * Math.sin(angle);
+				// Use fixed sun position
+				const fixedSunX = window.screen.width / 2;
+				const fixedSunY = window.screen.height / 2;
+				
+				planet.position.x = fixedSunX + semiMajorAxis * Math.cos(angle);
+				planet.position.y = fixedSunY + semiMinorAxis * Math.sin(angle);
 				planet.position.z = 0;
 				
 				planets.push(planet);
@@ -614,19 +621,18 @@ else
 
 		// Update sun position and animations if it exists
 		if (sun && wins.length > 0) {
-			let firstWin = wins[0];
-			let sunTargetX = firstWin.shape.x + (firstWin.shape.w * .5);
-			let sunTargetY = firstWin.shape.y + (firstWin.shape.h * .5);
+			// Sun stays at fixed screen center position
+			let sunX = window.screen.width / 2;
+			let sunY = window.screen.height / 2;
 			
-			// Smooth position update for sun
-			sun.position.x = sun.position.x + (sunTargetX - sun.position.x) * falloff;
-			sun.position.y = sun.position.y + (sunTargetY - sun.position.y) * falloff;
-			sunGlow.position.x = sun.position.x;
-			sunGlow.position.y = sun.position.y;
-			sunCorona.position.x = sun.position.x;
-			sunCorona.position.y = sun.position.y;
-			solarFlares.position.x = sun.position.x;
-			solarFlares.position.y = sun.position.y;
+			// Keep sun at fixed position
+			sun.position.x = sunX;
+			sun.position.y = sunY;
+			sunGlow.position.x = sunX;
+			sunGlow.position.y = sunY;
+			sunCorona.position.x = sunX;
+			sunCorona.position.y = sunY;
+			// solarFlares positions are in vertex data, no need to set position
 			
 			// Animate sun rotation
 			sun.rotation.y = t * 0.05;
@@ -660,8 +666,8 @@ else
 				flareLifetimes[i] -= 0.01;
 				
 				// Reset if lifetime expired or too far from sun
-				let dx = flarePositions[idx] - sun.position.x;
-				let dy = flarePositions[idx + 1] - sun.position.y;
+				let dx = flarePositions[idx] - sunX;
+				let dy = flarePositions[idx + 1] - sunY;
 				let dz = flarePositions[idx + 2];
 				let distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
 				
@@ -671,13 +677,13 @@ else
 					let phi = Math.acos(2 * Math.random() - 1);
 					let r = 60;
 					
-					flarePositions[idx] = r * Math.sin(phi) * Math.cos(theta) + sun.position.x;
-					flarePositions[idx + 1] = r * Math.sin(phi) * Math.sin(theta) + sun.position.y;
+					flarePositions[idx] = r * Math.sin(phi) * Math.cos(theta) + sunX;
+					flarePositions[idx + 1] = r * Math.sin(phi) * Math.sin(theta) + sunY;
 					flarePositions[idx + 2] = r * Math.cos(phi);
 					
 					// New velocity
-					flareVelocities[idx] = (flarePositions[idx] - sun.position.x) / r * (10 + Math.random() * 20);
-					flareVelocities[idx + 1] = (flarePositions[idx + 1] - sun.position.y) / r * (10 + Math.random() * 20);
+					flareVelocities[idx] = (flarePositions[idx] - sunX) / r * (10 + Math.random() * 20);
+					flareVelocities[idx + 1] = (flarePositions[idx + 1] - sunY) / r * (10 + Math.random() * 20);
 					flareVelocities[idx + 2] = flarePositions[idx + 2] / r * (10 + Math.random() * 20);
 					
 					flareLifetimes[i] = 1.0;
@@ -690,28 +696,34 @@ else
 			// Rotate flares system
 			solarFlares.rotation.y = t * 0.02;
 			
-			// Update orbit positions to follow sun
+			// Update orbit positions to fixed sun position
+			const fixedSunX = window.screen.width / 2;
+			const fixedSunY = window.screen.height / 2;
+			
 			orbits.forEach((orbit) => {
-				orbit.position.x = sun.position.x;
-				orbit.position.y = sun.position.y;
+				orbit.position.x = fixedSunX;
+				orbit.position.y = fixedSunY;
 			});
 			
 			// Update planet positions with orbital motion
 			planets.forEach((planet, index) => {
 				const planetInfo = planetData[index];
 				
-				// Update orbital angle based on orbital period
-				// Speed is scaled for visible motion (real periods would be too slow)
-				const orbitalSpeed = (1 / planetInfo.orbitalPeriod) * 0.01;
-				planet.userData.angle += orbitalSpeed;
+				// Use time-based angle for perfect sync across windows
+				const baseAngle = (getTime() * 0.002) / planetInfo.orbitalPeriod;
+				planet.userData.angle = baseAngle % (Math.PI * 2);
 				
 				const angle = planet.userData.angle;
 				const semiMajorAxis = planetInfo.semiMajorAxis;
 				const semiMinorAxis = semiMajorAxis * Math.sqrt(1 - planetInfo.eccentricity * planetInfo.eccentricity);
 				
+				// Use fixed sun position
+				const fixedSunX = window.screen.width / 2;
+				const fixedSunY = window.screen.height / 2;
+				
 				// Calculate position on elliptical orbit
-				planet.position.x = sun.position.x + semiMajorAxis * Math.cos(angle);
-				planet.position.y = sun.position.y + semiMinorAxis * Math.sin(angle);
+				planet.position.x = fixedSunX + semiMajorAxis * Math.cos(angle);
+				planet.position.y = fixedSunY + semiMinorAxis * Math.sin(angle);
 				
 				// Rotate planet on its axis
 				const rotationSpeed = Math.abs(planetInfo.rotationPeriod) > 1 
