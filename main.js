@@ -858,6 +858,7 @@ else
 				// Use time-based angle for perfect sync across windows
 				const baseAngle = (getTime() * 0.002) / planetInfo.orbitalPeriod;
 				planet.userData.angle = baseAngle % (Math.PI * 2);
+
 				
 				const angle = planet.userData.angle;
 				const semiMajorAxis = planetInfo.semiMajorAxis;
