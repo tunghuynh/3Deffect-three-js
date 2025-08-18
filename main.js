@@ -167,6 +167,16 @@ else
 		// Add star field
 		starField = createStarField();
 		scene.add(starField);
+		
+		// Add ambient light for overall illumination
+		const ambientLight = new t.AmbientLight(0x404040, 0.5);
+		scene.add(ambientLight);
+		
+		// Add point light at sun position (will be updated with sun)
+		const sunLight = new t.PointLight(0xFFFFFF, 2, 1000);
+		sunLight.position.set(0, 0, 0);
+		scene.add(sunLight);
+		scene.userData.sunLight = sunLight;
 
 		renderer = new t.WebGLRenderer({antialias: true, depthBuffer: true});
 		renderer.setPixelRatio(pixR);
@@ -203,10 +213,10 @@ else
 	const planetData = [
 		{
 			name: "Mercury",
-			radius: 8,
-			color: 0x8C7853,
-			emissive: 0x4C3813,
-			semiMajorAxis: 150,
+			radius: 5,
+			color: 0x8B7355,
+			emissive: 0x4A3A28,
+			semiMajorAxis: 100,
 			eccentricity: 0.206,
 			orbitalPeriod: 0.24, // Earth years
 			rotationPeriod: 58.6, // Earth days
@@ -215,10 +225,10 @@ else
 		},
 		{
 			name: "Venus",
-			radius: 15,
-			color: 0xFFC649,
-			emissive: 0x8F6629,
-			semiMajorAxis: 200,
+			radius: 10,
+			color: 0xFDB462,
+			emissive: 0x8B6239,
+			semiMajorAxis: 140,
 			eccentricity: 0.007,
 			orbitalPeriod: 0.62,
 			rotationPeriod: -243, // Negative = retrograde rotation
@@ -227,10 +237,10 @@ else
 		},
 		{
 			name: "Earth",
-			radius: 16,
-			color: 0x2233FF,
-			emissive: 0x112288,
-			semiMajorAxis: 250,
+			radius: 10,
+			color: 0x4A90E2,
+			emissive: 0x1A5490,
+			semiMajorAxis: 180,
 			eccentricity: 0.017,
 			orbitalPeriod: 1.0,
 			rotationPeriod: 1.0,
@@ -240,10 +250,10 @@ else
 		},
 		{
 			name: "Mars",
-			radius: 10,
-			color: 0xFF4500,
-			emissive: 0x882200,
-			semiMajorAxis: 300,
+			radius: 6,
+			color: 0xCD5C5C,
+			emissive: 0x8B3030,
+			semiMajorAxis: 220,
 			eccentricity: 0.093,
 			orbitalPeriod: 1.88,
 			rotationPeriod: 1.03,
@@ -252,10 +262,10 @@ else
 		},
 		{
 			name: "Jupiter",
-			radius: 35,
+			radius: 25,
 			color: 0xC88B3A,
 			emissive: 0x644520,
-			semiMajorAxis: 400,
+			semiMajorAxis: 300,
 			eccentricity: 0.048,
 			orbitalPeriod: 11.86,
 			rotationPeriod: 0.41,
@@ -265,40 +275,40 @@ else
 		},
 		{
 			name: "Saturn",
-			radius: 30,
+			radius: 22,
 			color: 0xFAD5A5,
 			emissive: 0x7A6A52,
-			semiMajorAxis: 500,
+			semiMajorAxis: 380,
 			eccentricity: 0.054,
 			orbitalPeriod: 29.46,
 			rotationPeriod: 0.44,
 			axialTilt: 26.7,
 			hasRings: true,
-			ringInnerRadius: 35,
-			ringOuterRadius: 55,
+			ringInnerRadius: 26,
+			ringOuterRadius: 40,
 			ringColor: 0xBBAA88
 		},
 		{
 			name: "Uranus",
-			radius: 22,
+			radius: 15,
 			color: 0x4FD0E7,
-			emissive: 0x276873,
-			semiMajorAxis: 600,
+			emissive: 0x2B6B73,
+			semiMajorAxis: 450,
 			eccentricity: 0.047,
 			orbitalPeriod: 84.01,
 			rotationPeriod: -0.72, // Negative = retrograde
 			axialTilt: 82.2,
 			hasRings: true,
-			ringInnerRadius: 24,
-			ringOuterRadius: 30,
-			ringColor: 0x668899
+			ringInnerRadius: 17,
+			ringOuterRadius: 22,
+			ringColor: 0x88AACC
 		},
 		{
 			name: "Neptune",
-			radius: 20,
-			color: 0x4B70DD,
-			emissive: 0x25386E,
-			semiMajorAxis: 700,
+			radius: 14,
+			color: 0x3F54BA,
+			emissive: 0x1F2A5D,
+			semiMajorAxis: 520,
 			eccentricity: 0.009,
 			orbitalPeriod: 164.79,
 			rotationPeriod: 0.67,
@@ -340,46 +350,175 @@ else
 	function createPlanet(planetInfo) {
 		const planetGroup = new t.Group();
 		
-		// Create planet sphere
-		const geometry = new t.SphereGeometry(planetInfo.radius, 32, 32);
-		const material = new t.MeshBasicMaterial({
-			color: planetInfo.color,
-			emissive: planetInfo.emissive,
-			emissiveIntensity: 0.2
-		});
+		// Create planet sphere with more detail
+		const geometry = new t.SphereGeometry(planetInfo.radius, 64, 64);
+		
+		// Create custom material based on planet type
+		let material;
+		
+		if (planetInfo.name === "Earth") {
+			// Earth with blue oceans and green/brown continents
+			material = new t.MeshPhongMaterial({
+				color: 0x2244AA,
+				emissive: 0x112244,
+				emissiveIntensity: 0.1,
+				shininess: 10
+			});
+		} else if (planetInfo.name === "Mars") {
+			// Mars with rust red color and darker regions
+			material = new t.MeshPhongMaterial({
+				color: 0xCD5C5C,
+				emissive: 0x551111,
+				emissiveIntensity: 0.1,
+				roughness: 0.8
+			});
+		} else if (planetInfo.name === "Jupiter") {
+			// Jupiter with banded appearance
+			material = new t.MeshPhongMaterial({
+				color: 0xC88B3A,
+				emissive: 0x443322,
+				emissiveIntensity: 0.05,
+				shininess: 5
+			});
+		} else if (planetInfo.name === "Saturn") {
+			// Saturn with pale gold color
+			material = new t.MeshPhongMaterial({
+				color: 0xFAD5A5,
+				emissive: 0x554422,
+				emissiveIntensity: 0.05,
+				shininess: 5
+			});
+		} else {
+			// Default material for other planets
+			material = new t.MeshPhongMaterial({
+				color: planetInfo.color,
+				emissive: planetInfo.emissive,
+				emissiveIntensity: 0.1,
+				shininess: planetInfo.name === "Venus" ? 20 : 5
+			});
+		}
+		
 		const planet = new t.Mesh(geometry, material);
 		planetGroup.add(planet);
 		
-		// Add rings if the planet has them
-		if (planetInfo.hasRings) {
-			const ringGeometry = new t.RingGeometry(
-				planetInfo.ringInnerRadius,
-				planetInfo.ringOuterRadius,
-				64
-			);
-			const ringMaterial = new t.MeshBasicMaterial({
-				color: planetInfo.ringColor,
-				side: t.DoubleSide,
+		// Add thick atmosphere for Venus
+		if (planetInfo.name === "Venus") {
+			const atmosphereGeometry = new t.SphereGeometry(planetInfo.radius * 1.1, 32, 32);
+			const atmosphereMaterial = new t.MeshPhongMaterial({
+				color: 0xFFDD88,
+				transparent: true,
+				opacity: 0.3,
+				side: t.BackSide
+			});
+			const atmosphere = new t.Mesh(atmosphereGeometry, atmosphereMaterial);
+			planetGroup.add(atmosphere);
+		}
+		
+		// Add ice caps for Mars
+		if (planetInfo.name === "Mars") {
+			// North pole ice cap
+			const northCapGeometry = new t.SphereGeometry(planetInfo.radius * 1.01, 16, 16);
+			const iceMaterial = new t.MeshPhongMaterial({
+				color: 0xFFFFFF,
+				emissive: 0xEEEEEE,
+				emissiveIntensity: 0.1,
 				transparent: true,
 				opacity: 0.7
 			});
-			const ring = new t.Mesh(ringGeometry, ringMaterial);
-			ring.rotation.x = Math.PI / 2; // Rotate to horizontal
-			planetGroup.add(ring);
+			const northCap = new t.Mesh(northCapGeometry, iceMaterial);
+			northCap.scale.set(0.3, 0.2, 0.3);
+			northCap.position.set(0, planetInfo.radius * 0.8, 0);
+			planetGroup.add(northCap);
+			
+			// South pole ice cap
+			const southCap = new t.Mesh(northCapGeometry, iceMaterial);
+			southCap.scale.set(0.25, 0.15, 0.25);
+			southCap.position.set(0, planetInfo.radius * -0.85, 0);
+			planetGroup.add(southCap);
+		}
+		
+		// Add thin atmosphere for Earth
+		if (planetInfo.name === "Earth") {
+			const atmosphereGeometry = new t.SphereGeometry(planetInfo.radius * 1.05, 32, 32);
+			const atmosphereMaterial = new t.MeshPhongMaterial({
+				color: 0x88CCFF,
+				transparent: true,
+				opacity: 0.2,
+				side: t.BackSide
+			});
+			const atmosphere = new t.Mesh(atmosphereGeometry, atmosphereMaterial);
+			planetGroup.add(atmosphere);
+		}
+		
+		// Add rings if the planet has them
+		if (planetInfo.hasRings) {
+			// Create multiple ring layers for more realistic appearance
+			const ringLayers = planetInfo.name === "Saturn" ? 3 : 2;
+			
+			for (let i = 0; i < ringLayers; i++) {
+				const innerRadius = planetInfo.ringInnerRadius + (i * 2);
+				const outerRadius = innerRadius + (planetInfo.ringOuterRadius - planetInfo.ringInnerRadius) / ringLayers - 0.5;
+				
+				const ringGeometry = new t.RingGeometry(
+					innerRadius,
+					outerRadius,
+					128
+				);
+				
+				// Vary opacity and color for each ring layer
+				const opacity = planetInfo.name === "Saturn" ? 0.7 - (i * 0.1) : 0.5 - (i * 0.1);
+				const ringMaterial = new t.MeshPhongMaterial({
+					color: planetInfo.ringColor,
+					side: t.DoubleSide,
+					transparent: true,
+					opacity: opacity,
+					emissive: planetInfo.ringColor,
+					emissiveIntensity: 0.05
+				});
+				
+				const ring = new t.Mesh(ringGeometry, ringMaterial);
+				ring.rotation.x = Math.PI / 2; // Rotate to horizontal
+				
+				// Slight tilt variation for each ring
+				ring.rotation.z = (Math.random() - 0.5) * 0.02;
+				
+				planetGroup.add(ring);
+			}
 		}
 		
 		// Add Great Red Spot for Jupiter
 		if (planetInfo.hasGreatRedSpot) {
-			const spotGeometry = new t.SphereGeometry(planetInfo.radius * 1.01, 16, 16);
-			const spotMaterial = new t.MeshBasicMaterial({
-				color: 0xFF0000,
+			// Create an elliptical spot
+			const spotGeometry = new t.SphereGeometry(planetInfo.radius * 1.01, 32, 32);
+			const spotMaterial = new t.MeshPhongMaterial({
+				color: 0xCC4422,
+				emissive: 0x661111,
+				emissiveIntensity: 0.2,
 				transparent: true,
-				opacity: 0.3
+				opacity: 0.6
 			});
 			const spot = new t.Mesh(spotGeometry, spotMaterial);
-			spot.scale.set(0.3, 0.2, 0.3);
-			spot.position.set(planetInfo.radius * 0.7, 0, 0);
+			spot.scale.set(0.4, 0.25, 0.4); // Elliptical shape
+			spot.position.set(planetInfo.radius * 0.6, planetInfo.radius * -0.2, 0);
 			planetGroup.add(spot);
+			
+			// Add swirling clouds around the spot
+			for (let i = 0; i < 3; i++) {
+				const cloudGeometry = new t.SphereGeometry(planetInfo.radius * 1.005, 16, 16);
+				const cloudMaterial = new t.MeshPhongMaterial({
+					color: 0xEEBB88,
+					transparent: true,
+					opacity: 0.2 - (i * 0.05)
+				});
+				const cloud = new t.Mesh(cloudGeometry, cloudMaterial);
+				cloud.scale.set(0.2 + i * 0.1, 0.15 + i * 0.05, 0.2 + i * 0.1);
+				cloud.position.set(
+					planetInfo.radius * (0.6 + i * 0.1),
+					planetInfo.radius * (-0.2 + (Math.random() - 0.5) * 0.2),
+					0
+				);
+				planetGroup.add(cloud);
+			}
 		}
 		
 		// Store planet data for animation
@@ -391,13 +530,13 @@ else
 		
 		// Add moon for Earth
 		if (planetInfo.hasMoon) {
-			const moonGeometry = new t.SphereGeometry(3, 16, 16);
+			const moonGeometry = new t.SphereGeometry(2, 16, 16);
 			const moonMaterial = new t.MeshBasicMaterial({
 				color: 0xAAAAAA,
 				emissive: 0x222222
 			});
 			const moon = new t.Mesh(moonGeometry, moonMaterial);
-			moon.position.set(25, 0, 0);
+			moon.position.set(15, 0, 0);
 			planetGroup.add(moon);
 			planetGroup.userData.moon = moon;
 		}
@@ -422,7 +561,7 @@ else
 
 	function createSun() {
 		// Create sun sphere
-		const sunGeometry = new t.SphereGeometry(60, 32, 32);
+		const sunGeometry = new t.SphereGeometry(40, 32, 32);
 		const sunMaterial = new t.MeshBasicMaterial({
 			color: 0xFFD700,
 			emissive: 0xFFAA00,
@@ -432,7 +571,7 @@ else
 		// Position will be set in updateSolarSystem
 		
 		// Create sun glow
-		const glowGeometry = new t.SphereGeometry(80, 32, 32);
+		const glowGeometry = new t.SphereGeometry(55, 32, 32);
 		const glowMaterial = new t.MeshBasicMaterial({
 			color: 0xFFAA00,
 			transparent: true,
@@ -443,7 +582,7 @@ else
 		// Position will be set in updateSolarSystem
 		
 		// Create corona effect
-		const coronaGeometry = new t.SphereGeometry(100, 32, 32);
+		const coronaGeometry = new t.SphereGeometry(70, 32, 32);
 		const coronaMaterial = new t.MeshBasicMaterial({
 			color: 0xFF6600,
 			transparent: true,
@@ -466,19 +605,16 @@ else
 			// Start at sun surface
 			const theta = Math.random() * Math.PI * 2;
 			const phi = Math.acos(2 * Math.random() - 1);
-			const r = 60;
+			const r = 40;
 			
-			// Use fixed sun position
-			const fixedSunX = window.screen.width / 2;
-			const fixedSunY = window.screen.height / 2;
-			
-			flarePositions[i * 3] = r * Math.sin(phi) * Math.cos(theta) + fixedSunX;
-			flarePositions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta) + fixedSunY;
+			// Start positions relative to origin, will be positioned with sun later
+			flarePositions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+			flarePositions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
 			flarePositions[i * 3 + 2] = r * Math.cos(phi);
 			
 			// Outward velocity
-			flareVelocities[i * 3] = (flarePositions[i * 3] - fixedSunX) / r * (10 + Math.random() * 20);
-			flareVelocities[i * 3 + 1] = (flarePositions[i * 3 + 1] - fixedSunY) / r * (10 + Math.random() * 20);
+			flareVelocities[i * 3] = flarePositions[i * 3] / r * (10 + Math.random() * 20);
+			flareVelocities[i * 3 + 1] = flarePositions[i * 3 + 1] / r * (10 + Math.random() * 20);
 			flareVelocities[i * 3 + 2] = flarePositions[i * 3 + 2] / r * (10 + Math.random() * 20);
 			
 			flareLifetimes[i] = Math.random();
@@ -540,10 +676,10 @@ else
 			createSun();
 			createOrbits();
 			
-			// Use a fixed absolute position for sun that's consistent across all windows
-			// Position at the center of the screen
-			let sunX = window.screen.width / 2;
-			let sunY = window.screen.height / 2;
+			// Position sun at the center of the first window's viewport
+			let firstWin = wins[0];
+			let sunX = firstWin.shape.x + (firstWin.shape.w * .5);
+			let sunY = firstWin.shape.y + (firstWin.shape.h * .5);
 			
 			sun.position.x = sunX;
 			sun.position.y = sunY;
@@ -551,7 +687,14 @@ else
 			sunGlow.position.y = sunY;
 			sunCorona.position.x = sunX;
 			sunCorona.position.y = sunY;
-			// solarFlares positions are in vertex data, no need to set position
+			solarFlares.position.x = sunX;
+			solarFlares.position.y = sunY;
+			
+			// Update sun light position
+			if (scene.userData.sunLight) {
+				scene.userData.sunLight.position.x = sunX;
+				scene.userData.sunLight.position.y = sunY;
+			}
 			
 			// Position orbits at sun position
 			orbits.forEach((orbit) => {
@@ -573,12 +716,8 @@ else
 				const semiMajorAxis = planetInfo.semiMajorAxis;
 				const semiMinorAxis = semiMajorAxis * Math.sqrt(1 - planetInfo.eccentricity * planetInfo.eccentricity);
 				
-				// Use fixed sun position
-				const fixedSunX = window.screen.width / 2;
-				const fixedSunY = window.screen.height / 2;
-				
-				planet.position.x = fixedSunX + semiMajorAxis * Math.cos(angle);
-				planet.position.y = fixedSunY + semiMinorAxis * Math.sin(angle);
+				planet.position.x = sunX + semiMajorAxis * Math.cos(angle);
+				planet.position.y = sunY + semiMinorAxis * Math.sin(angle);
 				planet.position.z = 0;
 				
 				planets.push(planet);
@@ -621,18 +760,26 @@ else
 
 		// Update sun position and animations if it exists
 		if (sun && wins.length > 0) {
-			// Sun stays at fixed screen center position
-			let sunX = window.screen.width / 2;
-			let sunY = window.screen.height / 2;
+			// Sun position based on first window center
+			let firstWin = wins[0];
+			let sunX = firstWin.shape.x + (firstWin.shape.w * .5);
+			let sunY = firstWin.shape.y + (firstWin.shape.h * .5);
 			
-			// Keep sun at fixed position
-			sun.position.x = sunX;
-			sun.position.y = sunY;
-			sunGlow.position.x = sunX;
-			sunGlow.position.y = sunY;
-			sunCorona.position.x = sunX;
-			sunCorona.position.y = sunY;
-			// solarFlares positions are in vertex data, no need to set position
+			// Update sun position smoothly
+			sun.position.x = sun.position.x + (sunX - sun.position.x) * falloff;
+			sun.position.y = sun.position.y + (sunY - sun.position.y) * falloff;
+			sunGlow.position.x = sun.position.x;
+			sunGlow.position.y = sun.position.y;
+			sunCorona.position.x = sun.position.x;
+			sunCorona.position.y = sun.position.y;
+			solarFlares.position.x = sun.position.x;
+			solarFlares.position.y = sun.position.y;
+			
+			// Update sun light position
+			if (scene.userData.sunLight) {
+				scene.userData.sunLight.position.x = sun.position.x;
+				scene.userData.sunLight.position.y = sun.position.y;
+			}
 			
 			// Animate sun rotation
 			sun.rotation.y = t * 0.05;
@@ -665,25 +812,25 @@ else
 				// Update lifetime
 				flareLifetimes[i] -= 0.01;
 				
-				// Reset if lifetime expired or too far from sun
-				let dx = flarePositions[idx] - sunX;
-				let dy = flarePositions[idx + 1] - sunY;
+				// Reset if lifetime expired or too far from sun (relative to origin since particles move with sun)
+				let dx = flarePositions[idx];
+				let dy = flarePositions[idx + 1];
 				let dz = flarePositions[idx + 2];
 				let distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
 				
-				if (flareLifetimes[i] <= 0 || distance > 200) {
+				if (flareLifetimes[i] <= 0 || distance > 150) {
 					// Reset to sun surface
 					let theta = Math.random() * Math.PI * 2;
 					let phi = Math.acos(2 * Math.random() - 1);
-					let r = 60;
+					let r = 40;
 					
-					flarePositions[idx] = r * Math.sin(phi) * Math.cos(theta) + sunX;
-					flarePositions[idx + 1] = r * Math.sin(phi) * Math.sin(theta) + sunY;
+					flarePositions[idx] = r * Math.sin(phi) * Math.cos(theta);
+					flarePositions[idx + 1] = r * Math.sin(phi) * Math.sin(theta);
 					flarePositions[idx + 2] = r * Math.cos(phi);
 					
 					// New velocity
-					flareVelocities[idx] = (flarePositions[idx] - sunX) / r * (10 + Math.random() * 20);
-					flareVelocities[idx + 1] = (flarePositions[idx + 1] - sunY) / r * (10 + Math.random() * 20);
+					flareVelocities[idx] = flarePositions[idx] / r * (10 + Math.random() * 20);
+					flareVelocities[idx + 1] = flarePositions[idx + 1] / r * (10 + Math.random() * 20);
 					flareVelocities[idx + 2] = flarePositions[idx + 2] / r * (10 + Math.random() * 20);
 					
 					flareLifetimes[i] = 1.0;
@@ -696,13 +843,10 @@ else
 			// Rotate flares system
 			solarFlares.rotation.y = t * 0.02;
 			
-			// Update orbit positions to fixed sun position
-			const fixedSunX = window.screen.width / 2;
-			const fixedSunY = window.screen.height / 2;
-			
+			// Update orbit positions to follow sun
 			orbits.forEach((orbit) => {
-				orbit.position.x = fixedSunX;
-				orbit.position.y = fixedSunY;
+				orbit.position.x = sunX;
+				orbit.position.y = sunY;
 			});
 			
 			// Update planet positions with orbital motion
@@ -717,13 +861,9 @@ else
 				const semiMajorAxis = planetInfo.semiMajorAxis;
 				const semiMinorAxis = semiMajorAxis * Math.sqrt(1 - planetInfo.eccentricity * planetInfo.eccentricity);
 				
-				// Use fixed sun position
-				const fixedSunX = window.screen.width / 2;
-				const fixedSunY = window.screen.height / 2;
-				
 				// Calculate position on elliptical orbit
-				planet.position.x = fixedSunX + semiMajorAxis * Math.cos(angle);
-				planet.position.y = fixedSunY + semiMinorAxis * Math.sin(angle);
+				planet.position.x = sunX + semiMajorAxis * Math.cos(angle);
+				planet.position.y = sunY + semiMinorAxis * Math.sin(angle);
 				
 				// Rotate planet on its axis
 				const rotationSpeed = Math.abs(planetInfo.rotationPeriod) > 1 
@@ -745,8 +885,8 @@ else
 				// Update moon position for Earth
 				if (planet.userData.moon) {
 					const moonAngle = t * 0.1; // Moon orbits faster
-					planet.userData.moon.position.x = 25 * Math.cos(moonAngle);
-					planet.userData.moon.position.z = 25 * Math.sin(moonAngle);
+					planet.userData.moon.position.x = 15 * Math.cos(moonAngle);
+					planet.userData.moon.position.z = 15 * Math.sin(moonAngle);
 				}
 				
 				// Rotate rings with planet
