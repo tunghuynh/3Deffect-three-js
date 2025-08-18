@@ -12,6 +12,7 @@ let sceneOffset = {x: 0, y: 0};
 let particleSystems = [];
 let glowMeshes = [];
 let innerCores = [];
+let starField;
 
 let today = new Date();
 today.setHours(0);
@@ -68,6 +69,49 @@ else
 		}, 500)	
 	}
 
+	function createStarField() {
+		const starCount = 5000;
+		const starGeometry = new t.BufferGeometry();
+		const positions = new Float32Array(starCount * 3);
+		const colors = new Float32Array(starCount * 3);
+		const sizes = new Float32Array(starCount);
+		
+		for (let i = 0; i < starCount; i++) {
+			// Random position in a large sphere
+			const theta = Math.random() * Math.PI * 2;
+			const phi = Math.acos(2 * Math.random() - 1);
+			const radius = 500 + Math.random() * 2000;
+			
+			positions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
+			positions[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
+			positions[i * 3 + 2] = radius * Math.cos(phi);
+			
+			// Random color (white to blue-ish)
+			const intensity = 0.5 + Math.random() * 0.5;
+			colors[i * 3] = intensity * (0.8 + Math.random() * 0.2);
+			colors[i * 3 + 1] = intensity * (0.8 + Math.random() * 0.2);
+			colors[i * 3 + 2] = intensity * (0.9 + Math.random() * 0.1);
+			
+			// Random size
+			sizes[i] = Math.random() * 2 + 0.5;
+		}
+		
+		starGeometry.setAttribute('position', new t.BufferAttribute(positions, 3));
+		starGeometry.setAttribute('color', new t.BufferAttribute(colors, 3));
+		starGeometry.setAttribute('size', new t.BufferAttribute(sizes, 1));
+		
+		const starMaterial = new t.PointsMaterial({
+			vertexColors: true,
+			size: 2,
+			sizeAttenuation: true,
+			transparent: true,
+			opacity: 0.8,
+			blending: t.AdditiveBlending
+		});
+		
+		return new t.Points(starGeometry, starMaterial);
+	}
+
 	function setupScene ()
 	{
 		camera = new t.OrthographicCamera(0, 0, window.innerWidth, window.innerHeight, -10000, 10000);
@@ -77,8 +121,49 @@ else
 		far = camera.position.z + 0.5;
 
 		scene = new t.Scene();
-		scene.background = new t.Color(0x0a0a0a); // Dark background for better energy effect visibility
+		
+		// Create gradient background for galaxy effect
+		const canvas = document.createElement('canvas');
+		canvas.width = 2048;
+		canvas.height = 2048;
+		const context = canvas.getContext('2d');
+		
+		// Create radial gradient
+		const gradient = context.createRadialGradient(
+			canvas.width / 2, canvas.height / 2, 0,
+			canvas.width / 2, canvas.height / 2, canvas.width / 2
+		);
+		gradient.addColorStop(0, '#1a0033'); // Deep purple center
+		gradient.addColorStop(0.4, '#0d001a'); // Dark blue
+		gradient.addColorStop(0.7, '#000011'); // Very dark blue
+		gradient.addColorStop(1, '#000000'); // Black edges
+		
+		context.fillStyle = gradient;
+		context.fillRect(0, 0, canvas.width, canvas.height);
+		
+		// Add some nebula colors
+		for (let i = 0; i < 10; i++) {
+			const x = Math.random() * canvas.width;
+			const y = Math.random() * canvas.height;
+			const radius = Math.random() * 200 + 100;
+			
+			const nebula = context.createRadialGradient(x, y, 0, x, y, radius);
+			nebula.addColorStop(0, `rgba(138, 43, 226, ${Math.random() * 0.1})`); // Purple
+			nebula.addColorStop(0.5, `rgba(75, 0, 130, ${Math.random() * 0.05})`); // Indigo
+			nebula.addColorStop(1, 'transparent');
+			
+			context.fillStyle = nebula;
+			context.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+		}
+		
+		const texture = new t.CanvasTexture(canvas);
+		scene.background = texture;
+		
 		scene.add( camera );
+
+		// Add star field
+		starField = createStarField();
+		scene.add(starField);
 
 		renderer = new t.WebGLRenderer({antialias: true, depthBuffer: true});
 		renderer.setPixelRatio(pixR);
@@ -254,6 +339,11 @@ else
 
 		let wins = windowManager.getWindows();
 
+		// Animate star field slowly
+		if (starField) {
+			starField.rotation.y = t * 0.01;
+			starField.rotation.x = t * 0.005;
+		}
 
 		// loop through all our spheres and update their positions and effects
 		for (let i = 0; i < spheres.length; i++)

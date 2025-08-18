@@ -1,0 +1,101 @@
+---
+alwaysApply: true
+---
+# Nguyên tắc Coding cho Dự án
+
+## 📋 Quy tắc chung
+
+### 1. ❌ Không sử dụng Command OS cho Refactoring
+- **KHÔNG** sử dụng các lệnh OS để refactor code hoặc các tác vụ tương tự
+- **KHÔNG** dùng lệnh như: `sed`, `awk`, `find/replace` từ terminal
+- **CHỈ** sử dụng các tool edit code được cung cấp
+- **Ngoại lệ**: Git commands được phép sử dụng
+
+### 2. ❌ Không sử dụng Command gộp "&&"
+- **KHÔNG** gộp nhiều lệnh với "&&"
+- **LUÔN** thực hiện từng lệnh riêng biệt
+- Ví dụ:
+  ```bash
+  # ❌ KHÔNG LÀM THẾ NÀY
+  npm install && npm run build && npm start
+  
+  # ✅ LÀM NHƯ THẾ NÀY
+  npm install
+  npm run build
+  npm start
+  ```
+
+### 3. ✅ Quy trình Git Commit
+- **PHẢI** thực hiện 3 lệnh độc lập theo thứ tự:
+  1. `git add .` hoặc `git add <file>`
+  2. `git commit -m "message"`
+  3. `git push`
+
+- **Ví dụ đúng:**
+  ```bash
+  git add .
+  git commit -m "feat: thêm hiệu ứng solar system"
+  git push
+  ```
+
+### 4. 💬 Quy tắc Git Commit Message
+- **Ngắn gọn** nhưng đủ ý nghĩa
+- **Format khuyến nghị:**
+  - `feat:` - Tính năng mới
+  - `fix:` - Sửa lỗi
+  - `docs:` - Cập nhật tài liệu
+  - `style:` - Thay đổi style/format code
+  - `refactor:` - Refactor code
+  - `test:` - Thêm test
+  - `chore:` - Các thay đổi khác
+
+- **Ví dụ:**
+  ```
+  feat: thêm background dải ngân hà
+  fix: sửa lỗi sync position giữa windows
+  refactor: tối ưu performance particle system
+  docs: cập nhật README với hướng dẫn mới
+  ```
+
+### 5. 🔄 Tần suất Commit
+- **Commit sau mỗi nhóm task hoàn thành**
+- **KHÔNG** chờ đến cuối ngày mới commit
+- **Mục đích**: Đảm bảo code được lưu trữ an toàn và có thể rollback
+
+## 📝 Ví dụ Workflow
+
+```bash
+# Bước 1: Code feature mới
+# ... code code code ...
+
+# Bước 2: Kiểm tra changes
+git status
+
+# Bước 3: Add files
+git add .
+
+# Bước 4: Commit với message rõ ràng
+git commit -m "feat: implement solar system với 8 planets"
+
+# Bước 5: Push lên remote
+git push
+
+# Lặp lại cho task tiếp theo
+```
+
+## ⚠️ Lưu ý quan trọng
+
+1. **Backup thường xuyên**: Commit và push giúp backup code
+2. **Message rõ ràng**: Giúp trace history dễ dàng
+3. **Atomic commits**: Mỗi commit nên focus vào 1 thay đổi cụ thể
+4. **Test trước khi commit**: Đảm bảo code chạy được
+
+## 🚀 Best Practices bổ sung
+
+1. **Review code trước khi commit**
+2. **Không commit code commented out**
+3. **Không commit file tạm hoặc debug logs**
+4. **Update TODO list sau mỗi task hoàn thành**
+5. **Document các thay đổi quan trọng**
+
+---
