@@ -72,7 +72,8 @@ else
 	}
 
 	function createStarField() {
-		const starCount = 5000;
+		// Optimize star count based on device performance
+		const starCount = window.devicePixelRatio > 1 ? 3000 : 5000;
 		const starGeometry = new t.BufferGeometry();
 		const positions = new Float32Array(starCount * 3);
 		const colors = new Float32Array(starCount * 3);
@@ -384,7 +385,7 @@ else
 		// Store planet data for animation
 		planetGroup.userData = {
 			...planetInfo,
-			angle: Math.random() * Math.PI * 2, // Random starting position
+			angle: 0, // Will be set based on time for sync
 			rotationAngle: 0
 		};
 		
@@ -453,7 +454,9 @@ else
 		sunCorona.position.copy(sun.position);
 		
 		// Create solar flares particle system
-		const flareCount = 1000;
+		// Reduce particle count based on number of windows for performance
+		const windowCount = windowManager ? windowManager.getWindows().length : 1;
+		const flareCount = Math.max(200, 1000 - (windowCount * 100));
 		const flareGeometry = new t.BufferGeometry();
 		const flarePositions = new Float32Array(flareCount * 3);
 		const flareVelocities = new Float32Array(flareCount * 3);
@@ -559,7 +562,11 @@ else
 				const planet = createPlanet(planetInfo);
 				
 				// Calculate initial position on orbit
-				const angle = planetInfo.angle || 0;
+				// Use a consistent starting angle based on current time for sync across windows
+				const baseAngle = (getTime() * 0.1) / planetInfo.orbitalPeriod;
+				planet.userData.angle = baseAngle % (Math.PI * 2);
+				
+				const angle = planet.userData.angle;
 				const semiMajorAxis = planetInfo.semiMajorAxis;
 				const semiMinorAxis = semiMajorAxis * Math.sqrt(1 - planetInfo.eccentricity * planetInfo.eccentricity);
 				
