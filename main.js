@@ -198,6 +198,55 @@ else
 		updateSolarSystem();
 	}
 
+	// Orbit data for 8 planets
+	const orbitData = [
+		{ name: "Mercury", semiMajorAxis: 150, eccentricity: 0.206, color: 0x666666 },
+		{ name: "Venus", semiMajorAxis: 200, eccentricity: 0.007, color: 0x777777 },
+		{ name: "Earth", semiMajorAxis: 250, eccentricity: 0.017, color: 0x4444ff },
+		{ name: "Mars", semiMajorAxis: 300, eccentricity: 0.093, color: 0xff4444 },
+		{ name: "Jupiter", semiMajorAxis: 400, eccentricity: 0.048, color: 0xaa8844 },
+		{ name: "Saturn", semiMajorAxis: 500, eccentricity: 0.054, color: 0xaaaa66 },
+		{ name: "Uranus", semiMajorAxis: 600, eccentricity: 0.047, color: 0x44aaaa },
+		{ name: "Neptune", semiMajorAxis: 700, eccentricity: 0.009, color: 0x4444aa }
+	];
+
+	function createOrbitLine(semiMajorAxis, eccentricity, color) {
+		const points = [];
+		const segments = 128;
+		const semiMinorAxis = semiMajorAxis * Math.sqrt(1 - eccentricity * eccentricity);
+		
+		for (let i = 0; i <= segments; i++) {
+			const angle = (i / segments) * Math.PI * 2;
+			const x = semiMajorAxis * Math.cos(angle);
+			const y = semiMinorAxis * Math.sin(angle);
+			points.push(new t.Vector3(x, y, 0));
+		}
+		
+		const geometry = new t.BufferGeometry().setFromPoints(points);
+		const material = new t.LineBasicMaterial({
+			color: color,
+			transparent: true,
+			opacity: 0.3
+		});
+		
+		return new t.Line(geometry, material);
+	}
+
+	function createOrbits() {
+		// Clear existing orbits
+		orbits.forEach((orbit) => {
+			world.remove(orbit);
+		});
+		orbits = [];
+		
+		// Create new orbits
+		orbitData.forEach((data) => {
+			const orbit = createOrbitLine(data.semiMajorAxis, data.eccentricity, data.color);
+			orbits.push(orbit);
+			world.add(orbit);
+		});
+	}
+
 	function createSun() {
 		// Create sun sphere
 		const sunGeometry = new t.SphereGeometry(60, 32, 32);
@@ -300,10 +349,17 @@ else
 			world.remove(planet);
 		});
 		planets = [];
+		
+		// Remove all orbits
+		orbits.forEach((orbit) => {
+			world.remove(orbit);
+		});
+		orbits = [];
 
-		// Create sun if at least one window is open
+		// Create sun and orbits if at least one window is open
 		if (wins.length > 0) {
 			createSun();
+			createOrbits();
 			
 			// Position sun at the center of the first window
 			let firstWin = wins[0];
@@ -318,6 +374,12 @@ else
 			sunCorona.position.y = sunY;
 			solarFlares.position.x = sunX;
 			solarFlares.position.y = sunY;
+			
+			// Position orbits at sun position
+			orbits.forEach((orbit) => {
+				orbit.position.x = sunX;
+				orbit.position.y = sunY;
+			});
 		}
 	}
 
@@ -430,6 +492,12 @@ else
 			
 			// Rotate flares system
 			solarFlares.rotation.y = t * 0.02;
+			
+			// Update orbit positions to follow sun
+			orbits.forEach((orbit) => {
+				orbit.position.x = sun.position.x;
+				orbit.position.y = sun.position.y;
+			});
 		}
 
 		renderer.render(scene, camera);
