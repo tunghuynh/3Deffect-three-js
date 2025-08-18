@@ -6,12 +6,14 @@ const t = THREE;
 let camera, scene, renderer, world;
 let near, far;
 let pixR = window.devicePixelRatio ? window.devicePixelRatio : 1;
-let spheres = [];
+let sun;
+let sunGlow;
+let sunCorona;
+let solarFlares;
+let planets = [];
+let orbits = [];
 let sceneOffsetTarget = {x: 0, y: 0};
 let sceneOffset = {x: 0, y: 0};
-let particleSystems = [];
-let glowMeshes = [];
-let innerCores = [];
 let starField;
 
 let today = new Date();
@@ -193,123 +195,129 @@ else
 
 	function windowsUpdated ()
 	{
-		updateNumberOfCubes();
+		updateSolarSystem();
 	}
 
-	function updateNumberOfCubes ()
+	function createSun() {
+		// Create sun sphere
+		const sunGeometry = new t.SphereGeometry(60, 32, 32);
+		const sunMaterial = new t.MeshBasicMaterial({
+			color: 0xFFD700,
+			emissive: 0xFFAA00,
+			emissiveIntensity: 1
+		});
+		sun = new t.Mesh(sunGeometry, sunMaterial);
+		sun.position.set(0, 0, 0);
+		
+		// Create sun glow
+		const glowGeometry = new t.SphereGeometry(80, 32, 32);
+		const glowMaterial = new t.MeshBasicMaterial({
+			color: 0xFFAA00,
+			transparent: true,
+			opacity: 0.4,
+			side: t.BackSide
+		});
+		sunGlow = new t.Mesh(glowGeometry, glowMaterial);
+		sunGlow.position.copy(sun.position);
+		
+		// Create corona effect
+		const coronaGeometry = new t.SphereGeometry(100, 32, 32);
+		const coronaMaterial = new t.MeshBasicMaterial({
+			color: 0xFF6600,
+			transparent: true,
+			opacity: 0.2,
+			side: t.BackSide
+		});
+		sunCorona = new t.Mesh(coronaGeometry, coronaMaterial);
+		sunCorona.position.copy(sun.position);
+		
+		// Create solar flares particle system
+		const flareCount = 1000;
+		const flareGeometry = new t.BufferGeometry();
+		const flarePositions = new Float32Array(flareCount * 3);
+		const flareVelocities = new Float32Array(flareCount * 3);
+		const flareLifetimes = new Float32Array(flareCount);
+		
+		for (let i = 0; i < flareCount; i++) {
+			// Start at sun surface
+			const theta = Math.random() * Math.PI * 2;
+			const phi = Math.acos(2 * Math.random() - 1);
+			const r = 60;
+			
+			flarePositions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+			flarePositions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+			flarePositions[i * 3 + 2] = r * Math.cos(phi);
+			
+			// Outward velocity
+			flareVelocities[i * 3] = flarePositions[i * 3] / r * (10 + Math.random() * 20);
+			flareVelocities[i * 3 + 1] = flarePositions[i * 3 + 1] / r * (10 + Math.random() * 20);
+			flareVelocities[i * 3 + 2] = flarePositions[i * 3 + 2] / r * (10 + Math.random() * 20);
+			
+			flareLifetimes[i] = Math.random();
+		}
+		
+		flareGeometry.setAttribute('position', new t.BufferAttribute(flarePositions, 3));
+		flareGeometry.setAttribute('velocity', new t.BufferAttribute(flareVelocities, 3));
+		flareGeometry.setAttribute('lifetime', new t.BufferAttribute(flareLifetimes, 1));
+		
+		const flareMaterial = new t.PointsMaterial({
+			color: 0xFFEE00,
+			size: 3,
+			transparent: true,
+			opacity: 0.8,
+			blending: t.AdditiveBlending,
+			vertexColors: false
+		});
+		
+		solarFlares = new t.Points(flareGeometry, flareMaterial);
+		solarFlares.position.copy(sun.position);
+		
+		// Add all to world
+		world.add(sunCorona);
+		world.add(sunGlow);
+		world.add(sun);
+		world.add(solarFlares);
+	}
+
+	function updateSolarSystem ()
 	{
 		let wins = windowManager.getWindows();
 
-		// remove all spheres and effects
-		spheres.forEach((s) => {
-			world.remove(s);
-		})
-		particleSystems.forEach((p) => {
-			world.remove(p);
-		})
-		glowMeshes.forEach((g) => {
-			world.remove(g);
-		})
-		innerCores.forEach((i) => {
-			world.remove(i);
-		})
+		// Clear previous solar system objects
+		if (sun) {
+			world.remove(sun);
+			world.remove(sunGlow);
+			world.remove(sunCorona);
+			world.remove(solarFlares);
+			sun = null;
+			sunGlow = null;
+			sunCorona = null;
+			solarFlares = null;
+		}
+		
+		// Remove all planets
+		planets.forEach((planet) => {
+			world.remove(planet);
+		});
+		planets = [];
 
-		spheres = [];
-		particleSystems = [];
-		glowMeshes = [];
-		innerCores = [];
-
-		// add new energy spheres based on the current window setup
-		for (let i = 0; i < wins.length; i++)
-		{
-			let win = wins[i];
-
-			let c = new t.Color();
-			c.setHSL(i * .1, 1.0, .6);
-
-			let radius = 50 + i * 25;
+		// Create sun if at least one window is open
+		if (wins.length > 0) {
+			createSun();
 			
-			// Create main sphere with energy core
-			let sphereGeometry = new t.SphereGeometry(radius, 32, 32);
-			let sphereMaterial = new t.MeshBasicMaterial({
-				color: c,
-				transparent: true,
-				opacity: 0.4,
-				wireframe: true
-			});
-			let sphere = new t.Mesh(sphereGeometry, sphereMaterial);
-			sphere.position.x = win.shape.x + (win.shape.w * .5);
-			sphere.position.y = win.shape.y + (win.shape.h * .5);
-
-			// Create inner energy core
-			let coreGeometry = new t.SphereGeometry(radius * 0.3, 16, 16);
-			let coreMaterial = new t.MeshBasicMaterial({
-				color: c,
-				transparent: true,
-				opacity: 1.0
-			});
-			let innerCore = new t.Mesh(coreGeometry, coreMaterial);
-			innerCore.position.copy(sphere.position);
-
-			// Create glow effect
-			let glowGeometry = new t.SphereGeometry(radius * 1.5, 32, 32);
-			let glowMaterial = new t.MeshBasicMaterial({
-				color: c,
-				transparent: true,
-				opacity: 0.2,
-				side: t.BackSide
-			});
-			let glowMesh = new t.Mesh(glowGeometry, glowMaterial);
-			glowMesh.position.copy(sphere.position);
-
-			// Create particle system for energy effect
-			let particleCount = 500;
-			let particles = new t.BufferGeometry();
-			let positions = new Float32Array(particleCount * 3);
-			let velocities = new Float32Array(particleCount * 3);
+			// Position sun at the center of the first window
+			let firstWin = wins[0];
+			let sunX = firstWin.shape.x + (firstWin.shape.w * .5);
+			let sunY = firstWin.shape.y + (firstWin.shape.h * .5);
 			
-			for (let j = 0; j < particleCount; j++) {
-				// Random position on sphere surface
-				let theta = Math.random() * Math.PI * 2;
-				let phi = Math.acos(2 * Math.random() - 1);
-				let r = radius;
-				
-				positions[j * 3] = r * Math.sin(phi) * Math.cos(theta) + sphere.position.x;
-				positions[j * 3 + 1] = r * Math.sin(phi) * Math.sin(theta) + sphere.position.y;
-				positions[j * 3 + 2] = r * Math.cos(phi);
-				
-				// Outward velocity
-				velocities[j * 3] = (positions[j * 3] - sphere.position.x) / r * 20;
-				velocities[j * 3 + 1] = (positions[j * 3 + 1] - sphere.position.y) / r * 20;
-				velocities[j * 3 + 2] = positions[j * 3 + 2] / r * 20;
-			}
-			
-			particles.setAttribute('position', new t.BufferAttribute(positions, 3));
-			particles.setAttribute('velocity', new t.BufferAttribute(velocities, 3));
-			
-			let particleMaterial = new t.PointsMaterial({
-				color: c,
-				size: 2,
-				transparent: true,
-				opacity: 0.6,
-				blending: t.AdditiveBlending
-			});
-			
-			let particleSystem = new t.Points(particles, particleMaterial);
-			particleSystem.userData = { 
-				originalPosition: sphere.position.clone(),
-				radius: radius
-			};
-
-			world.add(innerCore);
-			world.add(sphere);
-			world.add(glowMesh);
-			world.add(particleSystem);
-			
-			innerCores.push(innerCore);
-			spheres.push(sphere);
-			glowMeshes.push(glowMesh);
-			particleSystems.push(particleSystem);
+			sun.position.x = sunX;
+			sun.position.y = sunY;
+			sunGlow.position.x = sunX;
+			sunGlow.position.y = sunY;
+			sunCorona.position.x = sunX;
+			sunCorona.position.y = sunY;
+			solarFlares.position.x = sunX;
+			solarFlares.position.y = sunY;
 		}
 	}
 
@@ -345,87 +353,84 @@ else
 			starField.rotation.x = t * 0.005;
 		}
 
-		// loop through all our spheres and update their positions and effects
-		for (let i = 0; i < spheres.length; i++)
-		{
-			let sphere = spheres[i];
-			let innerCore = innerCores[i];
-			let glowMesh = glowMeshes[i];
-			let particleSystem = particleSystems[i];
-			let win = wins[i];
-			let _t = t + i * .2;
-
-			let posTarget = {x: win.shape.x + (win.shape.w * .5), y: win.shape.y + (win.shape.h * .5)}
-
-			// Smooth position update
-			sphere.position.x = sphere.position.x + (posTarget.x - sphere.position.x) * falloff;
-			sphere.position.y = sphere.position.y + (posTarget.y - sphere.position.y) * falloff;
+		// Update sun position and animations if it exists
+		if (sun && wins.length > 0) {
+			let firstWin = wins[0];
+			let sunTargetX = firstWin.shape.x + (firstWin.shape.w * .5);
+			let sunTargetY = firstWin.shape.y + (firstWin.shape.h * .5);
 			
-			// Update inner core position and animation
-			innerCore.position.copy(sphere.position);
-			let corePulse = Math.sin(_t * 4) * 0.3 + 1;
-			innerCore.scale.set(corePulse, corePulse, corePulse);
-			innerCore.rotation.x = _t * 2;
-			innerCore.rotation.y = _t * 3;
+			// Smooth position update for sun
+			sun.position.x = sun.position.x + (sunTargetX - sun.position.x) * falloff;
+			sun.position.y = sun.position.y + (sunTargetY - sun.position.y) * falloff;
+			sunGlow.position.x = sun.position.x;
+			sunGlow.position.y = sun.position.y;
+			sunCorona.position.x = sun.position.x;
+			sunCorona.position.y = sun.position.y;
+			solarFlares.position.x = sun.position.x;
+			solarFlares.position.y = sun.position.y;
 			
-			// Update glow mesh position
-			glowMesh.position.copy(sphere.position);
+			// Animate sun rotation
+			sun.rotation.y = t * 0.05;
 			
-			// Pulsing effect
-			let pulse = Math.sin(_t * 2) * 0.1 + 1;
-			sphere.scale.set(pulse, pulse, pulse);
+			// Pulse effects
+			let pulse = Math.sin(t * 2) * 0.05 + 1;
+			sun.scale.set(pulse, pulse, pulse);
 			
-			// Glow pulsing
-			let glowPulse = Math.sin(_t * 3) * 0.2 + 1.2;
-			glowMesh.scale.set(glowPulse, glowPulse, glowPulse);
-			glowMesh.material.opacity = 0.2 + Math.sin(_t * 4) * 0.1;
+			let glowPulse = Math.sin(t * 3) * 0.1 + 1.1;
+			sunGlow.scale.set(glowPulse, glowPulse, glowPulse);
+			sunGlow.material.opacity = 0.4 + Math.sin(t * 4) * 0.1;
 			
-			// Update sphere opacity for breathing effect
-			sphere.material.opacity = 0.4 + Math.sin(_t * 2.5) * 0.3;
+			let coronaPulse = Math.sin(t * 2.5) * 0.15 + 1.15;
+			sunCorona.scale.set(coronaPulse, coronaPulse, coronaPulse);
+			sunCorona.material.opacity = 0.2 + Math.sin(t * 3.5) * 0.05;
 			
-			// Animate particles
-			let positions = particleSystem.geometry.attributes.position.array;
-			let velocities = particleSystem.geometry.attributes.velocity.array;
-			let originalPos = particleSystem.userData.originalPosition;
-			let radius = particleSystem.userData.radius;
+			// Animate solar flares
+			let flarePositions = solarFlares.geometry.attributes.position.array;
+			let flareVelocities = solarFlares.geometry.attributes.velocity.array;
+			let flareLifetimes = solarFlares.geometry.attributes.lifetime.array;
 			
-			for (let j = 0; j < positions.length / 3; j++) {
-				let idx = j * 3;
+			for (let i = 0; i < flarePositions.length / 3; i++) {
+				let idx = i * 3;
 				
-				// Update particle positions
-				positions[idx] += velocities[idx] * 0.5;
-				positions[idx + 1] += velocities[idx + 1] * 0.5;
-				positions[idx + 2] += velocities[idx + 2] * 0.5;
+				// Update positions
+				flarePositions[idx] += flareVelocities[idx] * 0.5;
+				flarePositions[idx + 1] += flareVelocities[idx + 1] * 0.5;
+				flarePositions[idx + 2] += flareVelocities[idx + 2] * 0.5;
 				
-				// Calculate distance from center
-				let dx = positions[idx] - sphere.position.x;
-				let dy = positions[idx + 1] - sphere.position.y;
-				let dz = positions[idx + 2];
+				// Update lifetime
+				flareLifetimes[i] -= 0.01;
+				
+				// Reset if lifetime expired or too far from sun
+				let dx = flarePositions[idx] - sun.position.x;
+				let dy = flarePositions[idx + 1] - sun.position.y;
+				let dz = flarePositions[idx + 2];
 				let distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
 				
-				// Reset particles that have traveled too far
-				if (distance > radius * 3) {
-					// Reset to sphere surface
+				if (flareLifetimes[i] <= 0 || distance > 200) {
+					// Reset to sun surface
 					let theta = Math.random() * Math.PI * 2;
 					let phi = Math.acos(2 * Math.random() - 1);
+					let r = 60;
 					
-					positions[idx] = radius * Math.sin(phi) * Math.cos(theta) + sphere.position.x;
-					positions[idx + 1] = radius * Math.sin(phi) * Math.sin(theta) + sphere.position.y;
-					positions[idx + 2] = radius * Math.cos(phi);
+					flarePositions[idx] = r * Math.sin(phi) * Math.cos(theta) + sun.position.x;
+					flarePositions[idx + 1] = r * Math.sin(phi) * Math.sin(theta) + sun.position.y;
+					flarePositions[idx + 2] = r * Math.cos(phi);
 					
-					// Reset velocity
-					velocities[idx] = (positions[idx] - sphere.position.x) / radius * 20;
-					velocities[idx + 1] = (positions[idx + 1] - sphere.position.y) / radius * 20;
-					velocities[idx + 2] = positions[idx + 2] / radius * 20;
+					// New velocity
+					flareVelocities[idx] = (flarePositions[idx] - sun.position.x) / r * (10 + Math.random() * 20);
+					flareVelocities[idx + 1] = (flarePositions[idx + 1] - sun.position.y) / r * (10 + Math.random() * 20);
+					flareVelocities[idx + 2] = flarePositions[idx + 2] / r * (10 + Math.random() * 20);
+					
+					flareLifetimes[i] = 1.0;
 				}
 			}
 			
-			particleSystem.geometry.attributes.position.needsUpdate = true;
+			solarFlares.geometry.attributes.position.needsUpdate = true;
+			solarFlares.geometry.attributes.lifetime.needsUpdate = true;
 			
-			// Rotate particle system for extra effect
-			particleSystem.rotation.y = _t * 0.1;
-			particleSystem.rotation.z = _t * 0.05;
-		};
+			// Rotate flares system
+			solarFlares.rotation.y = t * 0.02;
+		}
 
 		renderer.render(scene, camera);
 		requestAnimationFrame(render);
