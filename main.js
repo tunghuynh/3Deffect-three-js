@@ -198,17 +198,121 @@ else
 		updateSolarSystem();
 	}
 
-	// Orbit data for 8 planets
-	const orbitData = [
-		{ name: "Mercury", semiMajorAxis: 150, eccentricity: 0.206, color: 0x666666 },
-		{ name: "Venus", semiMajorAxis: 200, eccentricity: 0.007, color: 0x777777 },
-		{ name: "Earth", semiMajorAxis: 250, eccentricity: 0.017, color: 0x4444ff },
-		{ name: "Mars", semiMajorAxis: 300, eccentricity: 0.093, color: 0xff4444 },
-		{ name: "Jupiter", semiMajorAxis: 400, eccentricity: 0.048, color: 0xaa8844 },
-		{ name: "Saturn", semiMajorAxis: 500, eccentricity: 0.054, color: 0xaaaa66 },
-		{ name: "Uranus", semiMajorAxis: 600, eccentricity: 0.047, color: 0x44aaaa },
-		{ name: "Neptune", semiMajorAxis: 700, eccentricity: 0.009, color: 0x4444aa }
+	// Planet data with realistic properties
+	const planetData = [
+		{
+			name: "Mercury",
+			radius: 8,
+			color: 0x8C7853,
+			emissive: 0x4C3813,
+			semiMajorAxis: 150,
+			eccentricity: 0.206,
+			orbitalPeriod: 0.24, // Earth years
+			rotationPeriod: 58.6, // Earth days
+			axialTilt: 0.03,
+			hasRings: false
+		},
+		{
+			name: "Venus",
+			radius: 15,
+			color: 0xFFC649,
+			emissive: 0x8F6629,
+			semiMajorAxis: 200,
+			eccentricity: 0.007,
+			orbitalPeriod: 0.62,
+			rotationPeriod: -243, // Negative = retrograde rotation
+			axialTilt: 177.4,
+			hasRings: false
+		},
+		{
+			name: "Earth",
+			radius: 16,
+			color: 0x2233FF,
+			emissive: 0x112288,
+			semiMajorAxis: 250,
+			eccentricity: 0.017,
+			orbitalPeriod: 1.0,
+			rotationPeriod: 1.0,
+			axialTilt: 23.5,
+			hasRings: false,
+			hasMoon: true
+		},
+		{
+			name: "Mars",
+			radius: 10,
+			color: 0xFF4500,
+			emissive: 0x882200,
+			semiMajorAxis: 300,
+			eccentricity: 0.093,
+			orbitalPeriod: 1.88,
+			rotationPeriod: 1.03,
+			axialTilt: 25.2,
+			hasRings: false
+		},
+		{
+			name: "Jupiter",
+			radius: 35,
+			color: 0xC88B3A,
+			emissive: 0x644520,
+			semiMajorAxis: 400,
+			eccentricity: 0.048,
+			orbitalPeriod: 11.86,
+			rotationPeriod: 0.41,
+			axialTilt: 3.1,
+			hasRings: false,
+			hasGreatRedSpot: true
+		},
+		{
+			name: "Saturn",
+			radius: 30,
+			color: 0xFAD5A5,
+			emissive: 0x7A6A52,
+			semiMajorAxis: 500,
+			eccentricity: 0.054,
+			orbitalPeriod: 29.46,
+			rotationPeriod: 0.44,
+			axialTilt: 26.7,
+			hasRings: true,
+			ringInnerRadius: 35,
+			ringOuterRadius: 55,
+			ringColor: 0xBBAA88
+		},
+		{
+			name: "Uranus",
+			radius: 22,
+			color: 0x4FD0E7,
+			emissive: 0x276873,
+			semiMajorAxis: 600,
+			eccentricity: 0.047,
+			orbitalPeriod: 84.01,
+			rotationPeriod: -0.72, // Negative = retrograde
+			axialTilt: 82.2,
+			hasRings: true,
+			ringInnerRadius: 24,
+			ringOuterRadius: 30,
+			ringColor: 0x668899
+		},
+		{
+			name: "Neptune",
+			radius: 20,
+			color: 0x4B70DD,
+			emissive: 0x25386E,
+			semiMajorAxis: 700,
+			eccentricity: 0.009,
+			orbitalPeriod: 164.79,
+			rotationPeriod: 0.67,
+			axialTilt: 28.3,
+			hasRings: false
+		}
 	];
+
+	// Use planet data for orbits too
+	const orbitData = planetData.map(planet => ({
+		name: planet.name,
+		semiMajorAxis: planet.semiMajorAxis,
+		eccentricity: planet.eccentricity,
+		color: planet.color
+	}));
 
 	function createOrbitLine(semiMajorAxis, eccentricity, color) {
 		const points = [];
@@ -230,6 +334,74 @@ else
 		});
 		
 		return new t.Line(geometry, material);
+	}
+
+	function createPlanet(planetInfo) {
+		const planetGroup = new t.Group();
+		
+		// Create planet sphere
+		const geometry = new t.SphereGeometry(planetInfo.radius, 32, 32);
+		const material = new t.MeshBasicMaterial({
+			color: planetInfo.color,
+			emissive: planetInfo.emissive,
+			emissiveIntensity: 0.2
+		});
+		const planet = new t.Mesh(geometry, material);
+		planetGroup.add(planet);
+		
+		// Add rings if the planet has them
+		if (planetInfo.hasRings) {
+			const ringGeometry = new t.RingGeometry(
+				planetInfo.ringInnerRadius,
+				planetInfo.ringOuterRadius,
+				64
+			);
+			const ringMaterial = new t.MeshBasicMaterial({
+				color: planetInfo.ringColor,
+				side: t.DoubleSide,
+				transparent: true,
+				opacity: 0.7
+			});
+			const ring = new t.Mesh(ringGeometry, ringMaterial);
+			ring.rotation.x = Math.PI / 2; // Rotate to horizontal
+			planetGroup.add(ring);
+		}
+		
+		// Add Great Red Spot for Jupiter
+		if (planetInfo.hasGreatRedSpot) {
+			const spotGeometry = new t.SphereGeometry(planetInfo.radius * 1.01, 16, 16);
+			const spotMaterial = new t.MeshBasicMaterial({
+				color: 0xFF0000,
+				transparent: true,
+				opacity: 0.3
+			});
+			const spot = new t.Mesh(spotGeometry, spotMaterial);
+			spot.scale.set(0.3, 0.2, 0.3);
+			spot.position.set(planetInfo.radius * 0.7, 0, 0);
+			planetGroup.add(spot);
+		}
+		
+		// Add moon for Earth
+		if (planetInfo.hasMoon) {
+			const moonGeometry = new t.SphereGeometry(3, 16, 16);
+			const moonMaterial = new t.MeshBasicMaterial({
+				color: 0xAAAAAA,
+				emissive: 0x222222
+			});
+			const moon = new t.Mesh(moonGeometry, moonMaterial);
+			moon.position.set(25, 0, 0);
+			planetGroup.add(moon);
+			planetGroup.userData.moon = moon;
+		}
+		
+		// Store planet data for animation
+		planetGroup.userData = {
+			...planetInfo,
+			angle: Math.random() * Math.PI * 2, // Random starting position
+			rotationAngle: 0
+		};
+		
+		return planetGroup;
 	}
 
 	function createOrbits() {
