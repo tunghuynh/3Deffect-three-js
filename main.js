@@ -212,7 +212,7 @@ else
 	const planetData = [
 		{
 			name: "Mercury",
-			radius: 5,
+			radius: 7.5,
 			color: 0x8B7355,
 			emissive: 0x4A3A28,
 			semiMajorAxis: 100,
@@ -224,7 +224,7 @@ else
 		},
 		{
 			name: "Venus",
-			radius: 10,
+			radius: 15,
 			color: 0xFDB462,
 			emissive: 0x8B6239,
 			semiMajorAxis: 140,
@@ -236,7 +236,7 @@ else
 		},
 		{
 			name: "Earth",
-			radius: 10,
+			radius: 15,
 			color: 0x4A90E2,
 			emissive: 0x1A5490,
 			semiMajorAxis: 180,
@@ -249,7 +249,7 @@ else
 		},
 		{
 			name: "Mars",
-			radius: 6,
+			radius: 9,
 			color: 0xCD5C5C,
 			emissive: 0x8B3030,
 			semiMajorAxis: 220,
@@ -261,7 +261,7 @@ else
 		},
 		{
 			name: "Jupiter",
-			radius: 25,
+			radius: 37.5,
 			color: 0xC88B3A,
 			emissive: 0x644520,
 			semiMajorAxis: 300,
@@ -274,7 +274,7 @@ else
 		},
 		{
 			name: "Saturn",
-			radius: 22,
+			radius: 33,
 			color: 0xFAD5A5,
 			emissive: 0x7A6A52,
 			semiMajorAxis: 380,
@@ -283,13 +283,13 @@ else
 			rotationPeriod: 0.44,
 			axialTilt: 26.7,
 			hasRings: true,
-			ringInnerRadius: 26,
-			ringOuterRadius: 40,
+			ringInnerRadius: 39,
+			ringOuterRadius: 60,
 			ringColor: 0xBBAA88
 		},
 		{
 			name: "Uranus",
-			radius: 15,
+			radius: 22.5,
 			color: 0x4FD0E7,
 			emissive: 0x2B6B73,
 			semiMajorAxis: 450,
@@ -298,13 +298,13 @@ else
 			rotationPeriod: -0.72, // Negative = retrograde
 			axialTilt: 82.2,
 			hasRings: true,
-			ringInnerRadius: 17,
-			ringOuterRadius: 22,
+			ringInnerRadius: 25.5,
+			ringOuterRadius: 33,
 			ringColor: 0x88AACC
 		},
 		{
 			name: "Neptune",
-			radius: 14,
+			radius: 21,
 			color: 0x3F54BA,
 			emissive: 0x1F2A5D,
 			semiMajorAxis: 520,
@@ -593,13 +593,13 @@ else
 		
 		// Add moon for Earth
 		if (planetInfo.hasMoon) {
-			const moonGeometry = new t.SphereGeometry(2, 16, 16);
+			const moonGeometry = new t.SphereGeometry(3, 16, 16);
 			const moonMaterial = new t.MeshBasicMaterial({
 				color: 0xAAAAAA,
 				emissive: 0x222222
 			});
 			const moon = new t.Mesh(moonGeometry, moonMaterial);
-			moon.position.set(15, 0, 0);
+			moon.position.set(22.5, 0, 0);
 			planetGroup.add(moon);
 			planetGroup.userData.moon = moon;
 		}
@@ -855,8 +855,8 @@ else
 				// Update moon position for Earth
 				if (planet.userData.moon) {
 					const moonAngle = t * 0.1; // Moon orbits faster
-					planet.userData.moon.position.x = 15 * Math.cos(moonAngle);
-					planet.userData.moon.position.z = 15 * Math.sin(moonAngle);
+					planet.userData.moon.position.x = 22.5 * Math.cos(moonAngle);
+					planet.userData.moon.position.z = 22.5 * Math.sin(moonAngle);
 				}
 				
 				// Rotate rings with planet
