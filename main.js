@@ -676,7 +676,7 @@ else
 			createSun();
 			createOrbits();
 			
-			// Position sun at the center of the first window's viewport
+			// Initial position sun at the center of the first window's viewport
 			let firstWin = wins[0];
 			let sunX = firstWin.shape.x + (firstWin.shape.w * .5);
 			let sunY = firstWin.shape.y + (firstWin.shape.h * .5);
@@ -760,14 +760,16 @@ else
 
 		// Update sun position and animations if it exists
 		if (sun && wins.length > 0) {
-			// Sun position based on first window center
+			// Always update sun position based on first window center
 			let firstWin = wins[0];
-			let sunX = firstWin.shape.x + (firstWin.shape.w * .5);
-			let sunY = firstWin.shape.y + (firstWin.shape.h * .5);
+			let sunTargetX = firstWin.shape.x + (firstWin.shape.w * .5);
+			let sunTargetY = firstWin.shape.y + (firstWin.shape.h * .5);
 			
-			// Update sun position smoothly
-			sun.position.x = sun.position.x + (sunX - sun.position.x) * falloff;
-			sun.position.y = sun.position.y + (sunY - sun.position.y) * falloff;
+			// Update sun position smoothly to follow first window
+			sun.position.x = sun.position.x + (sunTargetX - sun.position.x) * falloff;
+			sun.position.y = sun.position.y + (sunTargetY - sun.position.y) * falloff;
+			
+			// Update all sun-related objects to follow
 			sunGlow.position.x = sun.position.x;
 			sunGlow.position.y = sun.position.y;
 			sunCorona.position.x = sun.position.x;
@@ -812,7 +814,7 @@ else
 				// Update lifetime
 				flareLifetimes[i] -= 0.01;
 				
-				// Reset if lifetime expired or too far from sun (relative to origin since particles move with sun)
+				// Reset if lifetime expired or too far from sun center (0,0,0 since particles are in sun's local space)
 				let dx = flarePositions[idx];
 				let dy = flarePositions[idx + 1];
 				let dz = flarePositions[idx + 2];
@@ -843,10 +845,10 @@ else
 			// Rotate flares system
 			solarFlares.rotation.y = t * 0.02;
 			
-			// Update orbit positions to follow sun
+			// Update orbit positions to follow sun's current position
 			orbits.forEach((orbit) => {
-				orbit.position.x = sunX;
-				orbit.position.y = sunY;
+				orbit.position.x = sun.position.x;
+				orbit.position.y = sun.position.y;
 			});
 			
 			// Update planet positions with orbital motion
@@ -861,9 +863,9 @@ else
 				const semiMajorAxis = planetInfo.semiMajorAxis;
 				const semiMinorAxis = semiMajorAxis * Math.sqrt(1 - planetInfo.eccentricity * planetInfo.eccentricity);
 				
-				// Calculate position on elliptical orbit
-				planet.position.x = sunX + semiMajorAxis * Math.cos(angle);
-				planet.position.y = sunY + semiMinorAxis * Math.sin(angle);
+				// Calculate position on elliptical orbit based on sun's current position
+				planet.position.x = sun.position.x + semiMajorAxis * Math.cos(angle);
+				planet.position.y = sun.position.y + semiMinorAxis * Math.sin(angle);
 				
 				// Rotate planet on its axis
 				const rotationSpeed = Math.abs(planetInfo.rotationPeriod) > 1 
