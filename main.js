@@ -381,6 +381,13 @@ else
 			planetGroup.add(spot);
 		}
 		
+		// Store planet data for animation
+		planetGroup.userData = {
+			...planetInfo,
+			angle: Math.random() * Math.PI * 2, // Random starting position
+			rotationAngle: 0
+		};
+		
 		// Add moon for Earth
 		if (planetInfo.hasMoon) {
 			const moonGeometry = new t.SphereGeometry(3, 16, 16);
@@ -393,13 +400,6 @@ else
 			planetGroup.add(moon);
 			planetGroup.userData.moon = moon;
 		}
-		
-		// Store planet data for animation
-		planetGroup.userData = {
-			...planetInfo,
-			angle: Math.random() * Math.PI * 2, // Random starting position
-			rotationAngle: 0
-		};
 		
 		return planetGroup;
 	}
@@ -689,18 +689,53 @@ else
 				orbit.position.y = sun.position.y;
 			});
 			
-			// Update planet positions (simple static positions for now, motion will be added in next task)
+			// Update planet positions with orbital motion
 			planets.forEach((planet, index) => {
 				const planetInfo = planetData[index];
-				const angle = planet.userData.angle || 0;
+				
+				// Update orbital angle based on orbital period
+				// Speed is scaled for visible motion (real periods would be too slow)
+				const orbitalSpeed = (1 / planetInfo.orbitalPeriod) * 0.01;
+				planet.userData.angle += orbitalSpeed;
+				
+				const angle = planet.userData.angle;
 				const semiMajorAxis = planetInfo.semiMajorAxis;
 				const semiMinorAxis = semiMajorAxis * Math.sqrt(1 - planetInfo.eccentricity * planetInfo.eccentricity);
 				
+				// Calculate position on elliptical orbit
 				planet.position.x = sun.position.x + semiMajorAxis * Math.cos(angle);
 				planet.position.y = sun.position.y + semiMinorAxis * Math.sin(angle);
 				
 				// Rotate planet on its axis
-				planet.rotation.y += 0.01;
+				const rotationSpeed = Math.abs(planetInfo.rotationPeriod) > 1 
+					? 0.01 / Math.abs(planetInfo.rotationPeriod)
+					: 0.01 * Math.abs(planetInfo.rotationPeriod);
+				
+				// Handle retrograde rotation
+				if (planetInfo.rotationPeriod < 0) {
+					planet.userData.rotationAngle -= rotationSpeed;
+				} else {
+					planet.userData.rotationAngle += rotationSpeed;
+				}
+				
+				planet.rotation.y = planet.userData.rotationAngle;
+				
+				// Apply axial tilt
+				planet.rotation.z = (planetInfo.axialTilt * Math.PI) / 180;
+				
+				// Update moon position for Earth
+				if (planet.userData.moon) {
+					const moonAngle = t * 0.1; // Moon orbits faster
+					planet.userData.moon.position.x = 25 * Math.cos(moonAngle);
+					planet.userData.moon.position.z = 25 * Math.sin(moonAngle);
+				}
+				
+				// Rotate rings with planet
+				planet.children.forEach((child) => {
+					if (child.geometry && child.geometry.type === 'RingGeometry') {
+						child.rotation.z = -planet.rotation.z; // Keep rings horizontal relative to orbit
+					}
+				});
 			});
 		}
 
