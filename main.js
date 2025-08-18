@@ -552,6 +552,24 @@ else
 				orbit.position.x = sunX;
 				orbit.position.y = sunY;
 			});
+			
+			// Add planets based on number of windows (window 2 = Mercury, window 3 = Venus, etc.)
+			for (let i = 1; i < wins.length && i <= 8; i++) {
+				const planetInfo = planetData[i - 1]; // i-1 because array is 0-indexed
+				const planet = createPlanet(planetInfo);
+				
+				// Calculate initial position on orbit
+				const angle = planetInfo.angle || 0;
+				const semiMajorAxis = planetInfo.semiMajorAxis;
+				const semiMinorAxis = semiMajorAxis * Math.sqrt(1 - planetInfo.eccentricity * planetInfo.eccentricity);
+				
+				planet.position.x = sunX + semiMajorAxis * Math.cos(angle);
+				planet.position.y = sunY + semiMinorAxis * Math.sin(angle);
+				planet.position.z = 0;
+				
+				planets.push(planet);
+				world.add(planet);
+			}
 		}
 	}
 
@@ -669,6 +687,20 @@ else
 			orbits.forEach((orbit) => {
 				orbit.position.x = sun.position.x;
 				orbit.position.y = sun.position.y;
+			});
+			
+			// Update planet positions (simple static positions for now, motion will be added in next task)
+			planets.forEach((planet, index) => {
+				const planetInfo = planetData[index];
+				const angle = planet.userData.angle || 0;
+				const semiMajorAxis = planetInfo.semiMajorAxis;
+				const semiMinorAxis = semiMajorAxis * Math.sqrt(1 - planetInfo.eccentricity * planetInfo.eccentricity);
+				
+				planet.position.x = sun.position.x + semiMajorAxis * Math.cos(angle);
+				planet.position.y = sun.position.y + semiMinorAxis * Math.sin(angle);
+				
+				// Rotate planet on its axis
+				planet.rotation.y += 0.01;
 			});
 		}
 
