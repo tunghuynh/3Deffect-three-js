@@ -357,12 +357,76 @@ else
 		let material;
 		
 		if (planetInfo.name === "Earth") {
-			// Earth with blue oceans and green/brown continents
+			// Create Earth texture with continents and oceans
+			const earthCanvas = document.createElement('canvas');
+			earthCanvas.width = 512;
+			earthCanvas.height = 256;
+			const ctx = earthCanvas.getContext('2d');
+			
+			// Fill with ocean blue
+			ctx.fillStyle = '#1E4F8B';
+			ctx.fillRect(0, 0, earthCanvas.width, earthCanvas.height);
+			
+			// Add some ocean variation
+			for (let i = 0; i < 100; i++) {
+				ctx.fillStyle = `rgba(30, 79, ${139 + Math.random() * 20}, 0.3)`;
+				ctx.beginPath();
+				ctx.arc(Math.random() * earthCanvas.width, Math.random() * earthCanvas.height, 
+					Math.random() * 30 + 10, 0, Math.PI * 2);
+				ctx.fill();
+			}
+			
+			// Draw continents (simplified representation)
+			ctx.fillStyle = '#654321'; // Brown for land
+			
+			// Africa and Europe
+			ctx.beginPath();
+			ctx.ellipse(earthCanvas.width * 0.5, earthCanvas.height * 0.5, 40, 60, 0, 0, Math.PI * 2);
+			ctx.fill();
+			
+			// Asia
+			ctx.beginPath();
+			ctx.ellipse(earthCanvas.width * 0.65, earthCanvas.height * 0.35, 60, 40, 0.3, 0, Math.PI * 2);
+			ctx.fill();
+			
+			// Americas
+			ctx.beginPath();
+			ctx.ellipse(earthCanvas.width * 0.25, earthCanvas.height * 0.5, 30, 70, -0.2, 0, Math.PI * 2);
+			ctx.fill();
+			
+			// Australia
+			ctx.beginPath();
+			ctx.ellipse(earthCanvas.width * 0.75, earthCanvas.height * 0.7, 25, 15, 0, 0, Math.PI * 2);
+			ctx.fill();
+			
+			// Add green areas for forests
+			ctx.fillStyle = '#228B22';
+			for (let i = 0; i < 50; i++) {
+				const x = Math.random() * earthCanvas.width;
+				const y = Math.random() * earthCanvas.height;
+				// Check if we're on land (brown pixels)
+				const pixelData = ctx.getImageData(x, y, 1, 1).data;
+				if (pixelData[0] > 50 && pixelData[1] < 100) { // Brownish color
+					ctx.beginPath();
+					ctx.arc(x, y, Math.random() * 5 + 2, 0, Math.PI * 2);
+					ctx.fill();
+				}
+			}
+			
+			// Add ice caps
+			ctx.fillStyle = '#FFFFFF';
+			// North pole
+			ctx.fillRect(0, 0, earthCanvas.width, 15);
+			// South pole
+			ctx.fillRect(0, earthCanvas.height - 15, earthCanvas.width, 15);
+			
+			const earthTexture = new t.CanvasTexture(earthCanvas);
+			
 			material = new t.MeshPhongMaterial({
-				color: 0x2244AA,
+				map: earthTexture,
 				emissive: 0x112244,
-				emissiveIntensity: 0.1,
-				shininess: 10
+				emissiveIntensity: 0.05,
+				shininess: 20
 			});
 		} else if (planetInfo.name === "Mars") {
 			// Mars with rust red color and darker regions
@@ -407,7 +471,7 @@ else
 			const atmosphereMaterial = new t.MeshPhongMaterial({
 				color: 0xFFDD88,
 				transparent: true,
-				opacity: 0.3,
+				opacity: 0.5,
 				side: t.BackSide
 			});
 			const atmosphere = new t.Mesh(atmosphereGeometry, atmosphereMaterial);
@@ -423,7 +487,7 @@ else
 				emissive: 0xEEEEEE,
 				emissiveIntensity: 0.1,
 				transparent: true,
-				opacity: 0.7
+				opacity: 0.9
 			});
 			const northCap = new t.Mesh(northCapGeometry, iceMaterial);
 			northCap.scale.set(0.3, 0.2, 0.3);
@@ -443,7 +507,7 @@ else
 			const atmosphereMaterial = new t.MeshPhongMaterial({
 				color: 0x88CCFF,
 				transparent: true,
-				opacity: 0.2,
+				opacity: 0.3,
 				side: t.BackSide
 			});
 			const atmosphere = new t.Mesh(atmosphereGeometry, atmosphereMaterial);
@@ -466,7 +530,7 @@ else
 				);
 				
 				// Vary opacity and color for each ring layer
-				const opacity = planetInfo.name === "Saturn" ? 0.7 - (i * 0.1) : 0.5 - (i * 0.1);
+				const opacity = planetInfo.name === "Saturn" ? 0.8 - (i * 0.1) : 0.6 - (i * 0.1);
 				const ringMaterial = new t.MeshPhongMaterial({
 					color: planetInfo.ringColor,
 					side: t.DoubleSide,
@@ -709,7 +773,7 @@ else
 				
 				// Calculate initial position on orbit
 				// Use a consistent starting angle based on current time for sync across windows
-				const baseAngle = (getTime() * 0.002) / planetInfo.orbitalPeriod;
+				const baseAngle = (getTime() * 0.01) / planetInfo.orbitalPeriod;
 				planet.userData.angle = baseAngle % (Math.PI * 2);
 				
 				const angle = planet.userData.angle;
@@ -856,7 +920,7 @@ else
 				const planetInfo = planetData[index];
 				
 				// Use time-based angle for perfect sync across windows
-				const baseAngle = (getTime() * 0.002) / planetInfo.orbitalPeriod;
+				const baseAngle = (getTime() * 0.01) / planetInfo.orbitalPeriod;
 				planet.userData.angle = baseAngle % (Math.PI * 2);
 
 				
