@@ -1,4 +1,4 @@
-import WindowManager from './WindowManager.js'
+// WindowManager is loaded from WindowManager.js script tag
 
 
 
@@ -9,11 +9,18 @@ let pixR = window.devicePixelRatio ? window.devicePixelRatio : 1;
 let sun;
 let sunGlow;
 let sunCorona;
+// let solarFlares; // Đã bỏ hiệu ứng flare
 let planets = [];
 let orbits = [];
 let sceneOffsetTarget = {x: 0, y: 0};
 let sceneOffset = {x: 0, y: 0};
 let starField;
+
+// Drag functionality variables
+let isDragging = false;
+let dragOffset = {x: 0, y: 0};
+let sunUserOffset = {x: 0, y: 0}; // User-defined offset from drag
+let mouseStart = {x: 0, y: 0};
 
 let today = new Date();
 today.setHours(0);
@@ -59,10 +66,17 @@ else
 	{
 		initialized = true;
 
+		// Load sun offset from localStorage if exists
+		const savedOffset = localStorage.getItem('sunUserOffset');
+		if (savedOffset) {
+			sunUserOffset = JSON.parse(savedOffset);
+		}
+
 		// add a short timeout because window.offsetX reports wrong values before a short period 
 		setTimeout(() => {
 			setupScene();
 			setupWindowManager();
+			setupMouseEvents();
 			resize();
 			updateWindowShape(false);
 			render();
@@ -107,7 +121,7 @@ else
 			size: 2,
 			sizeAttenuation: true,
 			transparent: true,
-			opacity: 1,
+			opacity: 0.8,
 			blending: t.AdditiveBlending
 		});
 		
@@ -123,6 +137,14 @@ else
 		far = camera.position.z + 0.5;
 
 		scene = new t.Scene();
+		
+		// Add lighting for 3D effect
+		const ambientLight = new t.AmbientLight(0x404040, 0.5); // Soft ambient light
+		scene.add(ambientLight);
+		
+		const directionalLight = new t.DirectionalLight(0xffffff, 1);
+		directionalLight.position.set(100, 100, 50);
+		scene.add(directionalLight);
 		
 		// Create gradient background for galaxy effect
 		const canvas = document.createElement('canvas');
@@ -166,16 +188,6 @@ else
 		// Add star field
 		starField = createStarField();
 		scene.add(starField);
-		
-		// Add ambient light for overall illumination
-		const ambientLight = new t.AmbientLight(0x404040, 0.5);
-		scene.add(ambientLight);
-		
-		// Add point light at sun position (will be updated with sun)
-		const sunLight = new t.PointLight(0xFFFFFF, 2, 1000);
-		sunLight.position.set(0, 0, 0);
-		scene.add(sunLight);
-		scene.userData.sunLight = sunLight;
 
 		renderer = new t.WebGLRenderer({antialias: true, depthBuffer: true});
 		renderer.setPixelRatio(pixR);
@@ -185,6 +197,96 @@ else
 
 		renderer.domElement.setAttribute("id", "scene");
 		document.body.appendChild( renderer.domElement );
+	}
+
+	function setupMouseEvents() {
+		// Listen for storage changes to sync sun offset between windows
+		window.addEventListener('storage', (event) => {
+			if (event.key === 'sunUserOffset' && event.newValue) {
+				sunUserOffset = JSON.parse(event.newValue);
+			}
+		});
+
+		// Mouse down - check if clicking on sun
+		renderer.domElement.addEventListener('mousedown', (e) => {
+			if (!sun) return;
+			
+			const mouseX = e.clientX;
+			const mouseY = window.innerHeight - e.clientY; // Flip Y coordinate
+			
+			// Calculate distance from mouse to sun center
+			const dx = mouseX - sun.position.x;
+			const dy = mouseY - sun.position.y;
+			const distance = Math.sqrt(dx * dx + dy * dy);
+			
+			// Check if clicking within sun radius (60 + some margin)
+			if (distance < 80) {
+				isDragging = true;
+				mouseStart.x = mouseX;
+				mouseStart.y = mouseY;
+				dragOffset.x = sunUserOffset.x;
+				dragOffset.y = sunUserOffset.y;
+				
+				// Change cursor to grabbing
+				renderer.domElement.style.cursor = 'grabbing';
+				
+				// Prevent text selection while dragging
+				e.preventDefault();
+			}
+		});
+
+		// Mouse move - update sun position if dragging
+		window.addEventListener('mousemove', (e) => {
+			const mouseX = e.clientX;
+			const mouseY = window.innerHeight - e.clientY; // Flip Y coordinate
+			
+			if (isDragging && sun) {
+				// Calculate new offset
+				sunUserOffset.x = dragOffset.x + (mouseX - mouseStart.x);
+				sunUserOffset.y = dragOffset.y + (mouseY - mouseStart.y);
+				
+				// Save to localStorage to sync with other windows
+				localStorage.setItem('sunUserOffset', JSON.stringify(sunUserOffset));
+			} else if (sun) {
+				// Check if hovering over sun to show grab cursor
+				const dx = mouseX - sun.position.x;
+				const dy = mouseY - sun.position.y;
+				const distance = Math.sqrt(dx * dx + dy * dy);
+				
+				if (distance < 80) {
+					renderer.domElement.style.cursor = 'grab';
+				} else {
+					renderer.domElement.style.cursor = 'default';
+				}
+			}
+		});
+
+		// Mouse up - stop dragging
+		window.addEventListener('mouseup', (e) => {
+			if (isDragging) {
+				isDragging = false;
+				
+				// Check if still hovering over sun after release
+				if (sun) {
+					const mouseX = e.clientX;
+					const mouseY = window.innerHeight - e.clientY;
+					const dx = mouseX - sun.position.x;
+					const dy = mouseY - sun.position.y;
+					const distance = Math.sqrt(dx * dx + dy * dy);
+					
+					if (distance < 80) {
+						renderer.domElement.style.cursor = 'grab';
+					} else {
+						renderer.domElement.style.cursor = 'default';
+					}
+				}
+			}
+		});
+
+		// Also stop dragging if mouse leaves window
+		window.addEventListener('mouseleave', () => {
+			isDragging = false;
+		});
 	}
 
 	function setupWindowManager ()
@@ -212,10 +314,10 @@ else
 	const planetData = [
 		{
 			name: "Mercury",
-			radius: 7.5,
-			color: 0x8B7355,
-			emissive: 0x4A3A28,
-			semiMajorAxis: 100,
+			radius: 12,  // 8 * 1.5
+			color: 0x8C7853,
+			emissive: 0x4C3813,
+			semiMajorAxis: 90,  // 60% of 150
 			eccentricity: 0.206,
 			orbitalPeriod: 0.24, // Earth years
 			rotationPeriod: 58.6, // Earth days
@@ -224,10 +326,10 @@ else
 		},
 		{
 			name: "Venus",
-			radius: 15,
-			color: 0xFDB462,
-			emissive: 0x8B6239,
-			semiMajorAxis: 140,
+			radius: 22.5, // 15 * 1.5
+			color: 0xFFC649,
+			emissive: 0x8F6629,
+			semiMajorAxis: 120, // 60% of 200
 			eccentricity: 0.007,
 			orbitalPeriod: 0.62,
 			rotationPeriod: -243, // Negative = retrograde rotation
@@ -236,10 +338,10 @@ else
 		},
 		{
 			name: "Earth",
-			radius: 15,
-			color: 0x4A90E2,
-			emissive: 0x1A5490,
-			semiMajorAxis: 180,
+			radius: 24,  // 16 * 1.5
+			color: 0x2233FF,
+			emissive: 0x112288,
+			semiMajorAxis: 150, // 60% of 250
 			eccentricity: 0.017,
 			orbitalPeriod: 1.0,
 			rotationPeriod: 1.0,
@@ -249,10 +351,10 @@ else
 		},
 		{
 			name: "Mars",
-			radius: 9,
-			color: 0xCD5C5C,
-			emissive: 0x8B3030,
-			semiMajorAxis: 220,
+			radius: 15,  // 10 * 1.5
+			color: 0xFF4500,
+			emissive: 0x882200,
+			semiMajorAxis: 180, // 60% of 300
 			eccentricity: 0.093,
 			orbitalPeriod: 1.88,
 			rotationPeriod: 1.03,
@@ -261,10 +363,10 @@ else
 		},
 		{
 			name: "Jupiter",
-			radius: 37.5,
+			radius: 52.5, // 35 * 1.5
 			color: 0xC88B3A,
 			emissive: 0x644520,
-			semiMajorAxis: 300,
+			semiMajorAxis: 240, // 60% of 400
 			eccentricity: 0.048,
 			orbitalPeriod: 11.86,
 			rotationPeriod: 0.41,
@@ -274,40 +376,40 @@ else
 		},
 		{
 			name: "Saturn",
-			radius: 33,
+			radius: 45,  // 30 * 1.5
 			color: 0xFAD5A5,
 			emissive: 0x7A6A52,
-			semiMajorAxis: 380,
+			semiMajorAxis: 300, // 60% of 500
 			eccentricity: 0.054,
 			orbitalPeriod: 29.46,
 			rotationPeriod: 0.44,
 			axialTilt: 26.7,
 			hasRings: true,
-			ringInnerRadius: 39,
-			ringOuterRadius: 60,
+			ringInnerRadius: 35,
+			ringOuterRadius: 55,
 			ringColor: 0xBBAA88
 		},
 		{
 			name: "Uranus",
-			radius: 22.5,
+			radius: 33,  // 22 * 1.5
 			color: 0x4FD0E7,
-			emissive: 0x2B6B73,
-			semiMajorAxis: 450,
+			emissive: 0x276873,
+			semiMajorAxis: 360, // 60% of 600
 			eccentricity: 0.047,
 			orbitalPeriod: 84.01,
 			rotationPeriod: -0.72, // Negative = retrograde
 			axialTilt: 82.2,
 			hasRings: true,
-			ringInnerRadius: 25.5,
-			ringOuterRadius: 33,
-			ringColor: 0x88AACC
+			ringInnerRadius: 24,
+			ringOuterRadius: 30,
+			ringColor: 0x668899
 		},
 		{
 			name: "Neptune",
-			radius: 21,
-			color: 0x3F54BA,
-			emissive: 0x1F2A5D,
-			semiMajorAxis: 520,
+			radius: 30,  // 20 * 1.5
+			color: 0x4B70DD,
+			emissive: 0x25386E,
+			semiMajorAxis: 420, // 60% of 700
 			eccentricity: 0.009,
 			orbitalPeriod: 164.79,
 			rotationPeriod: 0.67,
@@ -340,248 +442,282 @@ else
 		const material = new t.LineBasicMaterial({
 			color: color,
 			transparent: true,
-			opacity: 1
+			opacity: 0.3
 		});
 		
 		return new t.Line(geometry, material);
+	}
+	
+	// Create procedural texture for planets
+	function createPlanetTexture(planetName) {
+		const canvas = document.createElement('canvas');
+		canvas.width = 512;
+		canvas.height = 256;
+		const ctx = canvas.getContext('2d');
+		
+		switch(planetName) {
+			case 'Mercury':
+				// Gray rocky surface with craters
+				ctx.fillStyle = '#8C7853';
+				ctx.fillRect(0, 0, canvas.width, canvas.height);
+				// Add some darker spots for craters
+				for(let i = 0; i < 30; i++) {
+					ctx.beginPath();
+					ctx.arc(Math.random() * canvas.width, Math.random() * canvas.height, 
+						Math.random() * 20 + 5, 0, Math.PI * 2);
+					ctx.fillStyle = `rgba(0,0,0,${Math.random() * 0.3 + 0.1})`;
+					ctx.fill();
+				}
+				break;
+				
+			case 'Venus':
+				// Yellowish with cloud patterns
+				const venusGradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
+				venusGradient.addColorStop(0, '#FFC649');
+				venusGradient.addColorStop(0.5, '#FFD873');
+				venusGradient.addColorStop(1, '#FFC649');
+				ctx.fillStyle = venusGradient;
+				ctx.fillRect(0, 0, canvas.width, canvas.height);
+				// Add cloud bands
+				for(let i = 0; i < canvas.height; i += 20) {
+					ctx.fillStyle = `rgba(255,255,255,${Math.random() * 0.2})`;
+					ctx.fillRect(0, i, canvas.width, 10);
+				}
+				break;
+				
+			case 'Earth':
+				// Blue with green landmasses
+				ctx.fillStyle = '#2233FF';
+				ctx.fillRect(0, 0, canvas.width, canvas.height);
+				// Add continents
+				ctx.fillStyle = '#2d5016';
+				// Simple continent shapes
+				ctx.fillRect(100, 50, 80, 60);
+				ctx.fillRect(250, 80, 100, 80);
+				ctx.fillRect(400, 100, 60, 40);
+				// Add clouds
+				ctx.fillStyle = 'rgba(255,255,255,0.3)';
+				for(let i = 0; i < 5; i++) {
+					ctx.fillRect(Math.random() * canvas.width, Math.random() * canvas.height, 
+						Math.random() * 100 + 50, 20);
+				}
+				break;
+				
+			case 'Mars':
+				// Reddish with darker regions
+				ctx.fillStyle = '#CD5C5C';
+				ctx.fillRect(0, 0, canvas.width, canvas.height);
+				// Add darker regions
+				ctx.fillStyle = '#8B4513';
+				for(let i = 0; i < 10; i++) {
+					ctx.fillRect(Math.random() * canvas.width, Math.random() * canvas.height,
+						Math.random() * 80 + 20, Math.random() * 40 + 10);
+				}
+				// Add polar ice caps
+				ctx.fillStyle = '#FFFFFF';
+				ctx.fillRect(0, 0, canvas.width, 20);
+				ctx.fillRect(0, canvas.height - 20, canvas.width, 20);
+				break;
+				
+			case 'Jupiter':
+				// Banded gas giant
+				const jupiterGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+				jupiterGradient.addColorStop(0, '#D4A373');
+				jupiterGradient.addColorStop(0.2, '#C88B3A');
+				jupiterGradient.addColorStop(0.4, '#E6C49D');
+				jupiterGradient.addColorStop(0.6, '#C88B3A');
+				jupiterGradient.addColorStop(0.8, '#D4A373');
+				jupiterGradient.addColorStop(1, '#C88B3A');
+				ctx.fillStyle = jupiterGradient;
+				ctx.fillRect(0, 0, canvas.width, canvas.height);
+				// Add Great Red Spot
+				ctx.fillStyle = '#CD5C5C';
+				ctx.beginPath();
+				ctx.ellipse(canvas.width * 0.7, canvas.height * 0.6, 40, 25, 0, 0, Math.PI * 2);
+				ctx.fill();
+				break;
+				
+			case 'Saturn':
+				// Pale yellow banded
+				const saturnGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+				saturnGradient.addColorStop(0, '#FAD5A5');
+				saturnGradient.addColorStop(0.5, '#F4E4C1');
+				saturnGradient.addColorStop(1, '#FAD5A5');
+				ctx.fillStyle = saturnGradient;
+				ctx.fillRect(0, 0, canvas.width, canvas.height);
+				// Add subtle bands
+				for(let i = 0; i < canvas.height; i += 30) {
+					ctx.fillStyle = `rgba(200,180,140,${Math.random() * 0.3})`;
+					ctx.fillRect(0, i, canvas.width, 15);
+				}
+				break;
+				
+			case 'Uranus':
+				// Pale blue-green
+				ctx.fillStyle = '#4FD0E7';
+				ctx.fillRect(0, 0, canvas.width, canvas.height);
+				// Add subtle methane haze
+				const uranusGradient = ctx.createRadialGradient(
+					canvas.width/2, canvas.height/2, 0,
+					canvas.width/2, canvas.height/2, canvas.width/2
+				);
+				uranusGradient.addColorStop(0, 'rgba(79, 208, 231, 0)');
+				uranusGradient.addColorStop(1, 'rgba(100, 220, 240, 0.3)');
+				ctx.fillStyle = uranusGradient;
+				ctx.fillRect(0, 0, canvas.width, canvas.height);
+				break;
+				
+			case 'Neptune':
+				// Deep blue with storm features
+				ctx.fillStyle = '#4B70DD';
+				ctx.fillRect(0, 0, canvas.width, canvas.height);
+				// Add storm bands
+				ctx.fillStyle = '#3B60CD';
+				for(let i = 0; i < 3; i++) {
+					ctx.fillRect(0, Math.random() * canvas.height, canvas.width, 30);
+				}
+				// Add dark spot
+				ctx.fillStyle = '#2B4099';
+				ctx.beginPath();
+				ctx.ellipse(canvas.width * 0.3, canvas.height * 0.4, 30, 20, 0, 0, Math.PI * 2);
+				ctx.fill();
+				break;
+				
+			default:
+				// Default gray texture
+				ctx.fillStyle = '#808080';
+				ctx.fillRect(0, 0, canvas.width, canvas.height);
+		}
+		
+		const texture = new t.CanvasTexture(canvas);
+		texture.needsUpdate = true;
+		return texture;
+	}
+	
+	// Create moon texture
+	function createMoonTexture() {
+		const canvas = document.createElement('canvas');
+		canvas.width = 256;
+		canvas.height = 128;
+		const ctx = canvas.getContext('2d');
+		
+		// Gray base
+		ctx.fillStyle = '#C0C0C0';
+		ctx.fillRect(0, 0, canvas.width, canvas.height);
+		
+		// Add craters
+		for(let i = 0; i < 20; i++) {
+			ctx.beginPath();
+			ctx.arc(Math.random() * canvas.width, Math.random() * canvas.height, 
+				Math.random() * 10 + 2, 0, Math.PI * 2);
+			ctx.fillStyle = `rgba(0,0,0,${Math.random() * 0.4 + 0.1})`;
+			ctx.fill();
+		}
+		
+		const texture = new t.CanvasTexture(canvas);
+		texture.needsUpdate = true;
+		return texture;
+	}
+	
+	// Create sun texture
+	function createSunTexture() {
+		const canvas = document.createElement('canvas');
+		canvas.width = 512;
+		canvas.height = 256;
+		const ctx = canvas.getContext('2d');
+		
+		// Create radial gradient for sun surface
+		const gradient = ctx.createRadialGradient(
+			canvas.width/2, canvas.height/2, 0,
+			canvas.width/2, canvas.height/2, canvas.width/2
+		);
+		gradient.addColorStop(0, '#FFEE00');
+		gradient.addColorStop(0.3, '#FFD700');
+		gradient.addColorStop(0.6, '#FFAA00');
+		gradient.addColorStop(1, '#FF8800');
+		
+		ctx.fillStyle = gradient;
+		ctx.fillRect(0, 0, canvas.width, canvas.height);
+		
+		// Add sun spots
+		for(let i = 0; i < 15; i++) {
+			ctx.beginPath();
+			ctx.arc(Math.random() * canvas.width, Math.random() * canvas.height,
+				Math.random() * 20 + 5, 0, Math.PI * 2);
+			ctx.fillStyle = `rgba(255,100,0,${Math.random() * 0.4 + 0.3})`;
+			ctx.fill();
+		}
+		
+		// Add bright spots
+		for(let i = 0; i < 10; i++) {
+			ctx.beginPath();
+			ctx.arc(Math.random() * canvas.width, Math.random() * canvas.height,
+				Math.random() * 15 + 3, 0, Math.PI * 2);
+			ctx.fillStyle = `rgba(255,255,200,${Math.random() * 0.3 + 0.2})`;
+			ctx.fill();
+		}
+		
+		const texture = new t.CanvasTexture(canvas);
+		texture.needsUpdate = true;
+		return texture;
 	}
 
 	function createPlanet(planetInfo) {
 		const planetGroup = new t.Group();
 		
-		// Create planet sphere with more detail
-		const geometry = new t.SphereGeometry(planetInfo.radius, 64, 64);
+		// Create planet sphere
+		const geometry = new t.SphereGeometry(planetInfo.radius, 32, 32);
 		
-		// Create custom material based on planet type
-		let material;
+		// Create texture for the planet
+		const texture = createPlanetTexture(planetInfo.name);
 		
-		if (planetInfo.name === "Earth") {
-			// Create Earth texture with continents and oceans
-			const earthCanvas = document.createElement('canvas');
-			earthCanvas.width = 512;
-			earthCanvas.height = 256;
-			const ctx = earthCanvas.getContext('2d');
-			
-			// Fill with ocean blue
-			ctx.fillStyle = '#1E4F8B';
-			ctx.fillRect(0, 0, earthCanvas.width, earthCanvas.height);
-			
-			// Add some ocean variation
-			for (let i = 0; i < 100; i++) {
-				ctx.fillStyle = `rgba(30, 79, ${139 + Math.random() * 20}, 0.3)`;
-				ctx.beginPath();
-				ctx.arc(Math.random() * earthCanvas.width, Math.random() * earthCanvas.height, 
-					Math.random() * 30 + 10, 0, Math.PI * 2);
-				ctx.fill();
-			}
-			
-			// Draw continents (simplified representation)
-			ctx.fillStyle = '#654321'; // Brown for land
-			
-			// Africa and Europe
-			ctx.beginPath();
-			ctx.ellipse(earthCanvas.width * 0.5, earthCanvas.height * 0.5, 40, 60, 0, 0, Math.PI * 2);
-			ctx.fill();
-			
-			// Asia
-			ctx.beginPath();
-			ctx.ellipse(earthCanvas.width * 0.65, earthCanvas.height * 0.35, 60, 40, 0.3, 0, Math.PI * 2);
-			ctx.fill();
-			
-			// Americas
-			ctx.beginPath();
-			ctx.ellipse(earthCanvas.width * 0.25, earthCanvas.height * 0.5, 30, 70, -0.2, 0, Math.PI * 2);
-			ctx.fill();
-			
-			// Australia
-			ctx.beginPath();
-			ctx.ellipse(earthCanvas.width * 0.75, earthCanvas.height * 0.7, 25, 15, 0, 0, Math.PI * 2);
-			ctx.fill();
-			
-			// Add green areas for forests
-			ctx.fillStyle = '#228B22';
-			for (let i = 0; i < 50; i++) {
-				const x = Math.random() * earthCanvas.width;
-				const y = Math.random() * earthCanvas.height;
-				// Check if we're on land (brown pixels)
-				const pixelData = ctx.getImageData(x, y, 1, 1).data;
-				if (pixelData[0] > 50 && pixelData[1] < 100) { // Brownish color
-					ctx.beginPath();
-					ctx.arc(x, y, Math.random() * 5 + 2, 0, Math.PI * 2);
-					ctx.fill();
-				}
-			}
-			
-			// Add ice caps
-			ctx.fillStyle = '#FFFFFF';
-			// North pole
-			ctx.fillRect(0, 0, earthCanvas.width, 15);
-			// South pole
-			ctx.fillRect(0, earthCanvas.height - 15, earthCanvas.width, 15);
-			
-			const earthTexture = new t.CanvasTexture(earthCanvas);
-			
-			material = new t.MeshPhongMaterial({
-				map: earthTexture,
-				emissive: 0x112244,
-				emissiveIntensity: 0.05,
-				shininess: 20
-			});
-		} else if (planetInfo.name === "Mars") {
-			// Mars with rust red color and darker regions
-			material = new t.MeshPhongMaterial({
-				color: 0xCD5C5C,
-				emissive: 0x551111,
-				emissiveIntensity: 0.1,
-				roughness: 0.8
-			});
-		} else if (planetInfo.name === "Jupiter") {
-			// Jupiter with banded appearance
-			material = new t.MeshPhongMaterial({
-				color: 0xC88B3A,
-				emissive: 0x443322,
-				emissiveIntensity: 0.05,
-				shininess: 5
-			});
-		} else if (planetInfo.name === "Saturn") {
-			// Saturn with pale gold color
-			material = new t.MeshPhongMaterial({
-				color: 0xFAD5A5,
-				emissive: 0x554422,
-				emissiveIntensity: 0.05,
-				shininess: 5
-			});
-		} else {
-			// Default material for other planets
-			material = new t.MeshPhongMaterial({
-				color: planetInfo.color,
-				emissive: planetInfo.emissive,
-				emissiveIntensity: 0.1,
-				shininess: planetInfo.name === "Venus" ? 20 : 5
-			});
-		}
+		// Use Phong material for better lighting
+		const material = new t.MeshPhongMaterial({
+			map: texture,
+			shininess: planetInfo.name === 'Earth' || planetInfo.name === 'Neptune' || planetInfo.name === 'Uranus' ? 30 : 10,
+			emissive: planetInfo.emissive,
+			emissiveIntensity: planetInfo.name === 'Sun' ? 1 : 0.05,
+			bumpScale: 0.05
+		});
 		
 		const planet = new t.Mesh(geometry, material);
 		planetGroup.add(planet);
 		
-		// Add thick atmosphere for Venus
-		if (planetInfo.name === "Venus") {
-			const atmosphereGeometry = new t.SphereGeometry(planetInfo.radius * 1.1, 32, 32);
-			const atmosphereMaterial = new t.MeshPhongMaterial({
-				color: 0xFFDD88,
-				transparent: true,
-				opacity: 1,
-				side: t.BackSide
-			});
-			const atmosphere = new t.Mesh(atmosphereGeometry, atmosphereMaterial);
-			planetGroup.add(atmosphere);
-		}
-		
-		// Add ice caps for Mars
-		if (planetInfo.name === "Mars") {
-			// North pole ice cap
-			const northCapGeometry = new t.SphereGeometry(planetInfo.radius * 1.01, 16, 16);
-			const iceMaterial = new t.MeshPhongMaterial({
-				color: 0xFFFFFF,
-				emissive: 0xEEEEEE,
-				emissiveIntensity: 0.1,
-				transparent: true,
-				opacity: 1
-			});
-			const northCap = new t.Mesh(northCapGeometry, iceMaterial);
-			northCap.scale.set(0.3, 0.2, 0.3);
-			northCap.position.set(0, planetInfo.radius * 0.8, 0);
-			planetGroup.add(northCap);
-			
-			// South pole ice cap
-			const southCap = new t.Mesh(northCapGeometry, iceMaterial);
-			southCap.scale.set(0.25, 0.15, 0.25);
-			southCap.position.set(0, planetInfo.radius * -0.85, 0);
-			planetGroup.add(southCap);
-		}
-		
-		// Add thin atmosphere for Earth
-		if (planetInfo.name === "Earth") {
-			const atmosphereGeometry = new t.SphereGeometry(planetInfo.radius * 1.05, 32, 32);
-			const atmosphereMaterial = new t.MeshPhongMaterial({
-				color: 0x88CCFF,
-				transparent: true,
-				opacity: 1,
-				side: t.BackSide
-			});
-			const atmosphere = new t.Mesh(atmosphereGeometry, atmosphereMaterial);
-			planetGroup.add(atmosphere);
-		}
-		
 		// Add rings if the planet has them
 		if (planetInfo.hasRings) {
-			// Create multiple ring layers for more realistic appearance
-			const ringLayers = planetInfo.name === "Saturn" ? 3 : 2;
-			
-			for (let i = 0; i < ringLayers; i++) {
-				const innerRadius = planetInfo.ringInnerRadius + (i * 2);
-				const outerRadius = innerRadius + (planetInfo.ringOuterRadius - planetInfo.ringInnerRadius) / ringLayers - 0.5;
-				
-				const ringGeometry = new t.RingGeometry(
-					innerRadius,
-					outerRadius,
-					128
-				);
-				
-				// Vary opacity and color for each ring layer
-				const opacity = 1;
-				const ringMaterial = new t.MeshPhongMaterial({
-					color: planetInfo.ringColor,
-					side: t.DoubleSide,
-					transparent: true,
-					opacity: opacity,
-					emissive: planetInfo.ringColor,
-					emissiveIntensity: 0.05
-				});
-				
-				const ring = new t.Mesh(ringGeometry, ringMaterial);
-				ring.rotation.x = Math.PI / 2; // Rotate to horizontal
-				
-				// Slight tilt variation for each ring
-				ring.rotation.z = (Math.random() - 0.5) * 0.02;
-				
-				planetGroup.add(ring);
-			}
+			const ringGeometry = new t.RingGeometry(
+				planetInfo.ringInnerRadius,
+				planetInfo.ringOuterRadius,
+				64
+			);
+			const ringMaterial = new t.MeshPhongMaterial({
+				color: planetInfo.ringColor,
+				side: t.DoubleSide,
+				transparent: true,
+				opacity: 0.7,
+				shininess: 50,
+				emissive: planetInfo.ringColor,
+				emissiveIntensity: 0.1
+			});
+			const ring = new t.Mesh(ringGeometry, ringMaterial);
+			ring.rotation.x = Math.PI / 2; // Rotate to horizontal
+			planetGroup.add(ring);
 		}
 		
 		// Add Great Red Spot for Jupiter
 		if (planetInfo.hasGreatRedSpot) {
-			// Create an elliptical spot
-			const spotGeometry = new t.SphereGeometry(planetInfo.radius * 1.01, 32, 32);
+			const spotGeometry = new t.SphereGeometry(planetInfo.radius * 1.01, 16, 16);
 			const spotMaterial = new t.MeshPhongMaterial({
-				color: 0xCC4422,
-				emissive: 0x661111,
-				emissiveIntensity: 0.2,
+				color: 0xFF0000,
 				transparent: true,
-				opacity: 1
+				opacity: 0.3,
+				emissive: 0xFF0000,
+				emissiveIntensity: 0.2
 			});
 			const spot = new t.Mesh(spotGeometry, spotMaterial);
-			spot.scale.set(0.4, 0.25, 0.4); // Elliptical shape
-			spot.position.set(planetInfo.radius * 0.6, planetInfo.radius * -0.2, 0);
+			spot.scale.set(0.3, 0.2, 0.3);
+			spot.position.set(planetInfo.radius * 0.7, 0, 0);
 			planetGroup.add(spot);
-			
-			// Add swirling clouds around the spot
-			for (let i = 0; i < 3; i++) {
-				const cloudGeometry = new t.SphereGeometry(planetInfo.radius * 1.005, 16, 16);
-				const cloudMaterial = new t.MeshPhongMaterial({
-					color: 0xEEBB88,
-					transparent: true,
-					opacity: 1
-				});
-				const cloud = new t.Mesh(cloudGeometry, cloudMaterial);
-				cloud.scale.set(0.2 + i * 0.1, 0.15 + i * 0.05, 0.2 + i * 0.1);
-				cloud.position.set(
-					planetInfo.radius * (0.6 + i * 0.1),
-					planetInfo.radius * (-0.2 + (Math.random() - 0.5) * 0.2),
-					0
-				);
-				planetGroup.add(cloud);
-			}
 		}
 		
 		// Store planet data for animation
@@ -593,18 +729,69 @@ else
 		
 		// Add moon for Earth
 		if (planetInfo.hasMoon) {
-			const moonGeometry = new t.SphereGeometry(3, 16, 16);
-			const moonMaterial = new t.MeshBasicMaterial({
-				color: 0xAAAAAA,
-				emissive: 0x222222
+			const moonGeometry = new t.SphereGeometry(4.5, 16, 16); // 3 * 1.5
+			const moonTexture = createMoonTexture();
+			const moonMaterial = new t.MeshPhongMaterial({
+				map: moonTexture,
+				shininess: 5,
+				emissive: 0x222222,
+				emissiveIntensity: 0.1
 			});
 			const moon = new t.Mesh(moonGeometry, moonMaterial);
-			moon.position.set(22.5, 0, 0);
+			moon.position.set(25, 0, 0);
 			planetGroup.add(moon);
 			planetGroup.userData.moon = moon;
 		}
 		
+		// Add label for planet name
+		const label = createLabel(planetInfo.name);
+		label.position.y = planetInfo.radius + 20; // Position above planet
+		planetGroup.add(label);
+		planetGroup.userData.label = label;
+		
 		return planetGroup;
+	}
+	
+	// Create label for planet names
+	function createLabel(text) {
+		const canvas = document.createElement('canvas');
+		const context = canvas.getContext('2d');
+		canvas.width = 256;
+		canvas.height = 64;
+		
+		// Clear canvas
+		context.clearRect(0, 0, canvas.width, canvas.height);
+		
+		// Set text properties
+		context.font = 'Bold 24px Arial';
+		context.fillStyle = 'white';
+		context.textAlign = 'center';
+		context.textBaseline = 'middle';
+		
+		// Add text shadow for better visibility
+		context.shadowColor = 'black';
+		context.shadowBlur = 4;
+		context.shadowOffsetX = 2;
+		context.shadowOffsetY = 2;
+		
+		// Draw text
+		context.fillText(text, canvas.width / 2, canvas.height / 2);
+		
+		// Create texture from canvas
+		const texture = new t.CanvasTexture(canvas);
+		texture.needsUpdate = true;
+		
+		// Create sprite material
+		const spriteMaterial = new t.SpriteMaterial({ 
+			map: texture,
+			transparent: true
+		});
+		
+		// Create sprite
+		const sprite = new t.Sprite(spriteMaterial);
+		sprite.scale.set(40, 10, 1);
+		
+		return sprite;
 	}
 
 	function createOrbits() {
@@ -623,44 +810,98 @@ else
 	}
 
 	function createSun() {
+		// Create sun group
+		const sunGroup = new t.Group();
+		
 		// Create sun sphere
-		const sunGeometry = new t.SphereGeometry(40, 32, 32);
+		const sunGeometry = new t.SphereGeometry(60, 32, 32);
+		const sunTexture = createSunTexture();
 		const sunMaterial = new t.MeshBasicMaterial({
-			color: 0xFFD700,
+			map: sunTexture,
 			emissive: 0xFFAA00,
 			emissiveIntensity: 1
 		});
 		sun = new t.Mesh(sunGeometry, sunMaterial);
-		// Position will be set in updateSolarSystem
+		sun.position.set(0, 0, 0);
 		
 		// Create sun glow
-		const glowGeometry = new t.SphereGeometry(55, 32, 32);
+		const glowGeometry = new t.SphereGeometry(80, 32, 32);
 		const glowMaterial = new t.MeshBasicMaterial({
 			color: 0xFFAA00,
 			transparent: true,
-			opacity: 1,
+			opacity: 0.4,
 			side: t.BackSide
 		});
 		sunGlow = new t.Mesh(glowGeometry, glowMaterial);
-		// Position will be set in updateSolarSystem
+		sunGlow.position.copy(sun.position);
 		
 		// Create corona effect
-		const coronaGeometry = new t.SphereGeometry(70, 32, 32);
+		const coronaGeometry = new t.SphereGeometry(100, 32, 32);
 		const coronaMaterial = new t.MeshBasicMaterial({
 			color: 0xFF6600,
 			transparent: true,
-			opacity: 1,
+			opacity: 0.2,
 			side: t.BackSide
 		});
 		sunCorona = new t.Mesh(coronaGeometry, coronaMaterial);
-		// Position will be set in updateSolarSystem
+		sunCorona.position.copy(sun.position);
 		
-		// Solar flares removed for cleaner visual
+		// Add label for sun
+		const sunLabel = createLabel('Sun');
+		sunLabel.position.y = 80; // Position above sun
+		sun.userData.label = sunLabel;
+		
+		/* Đã bỏ hiệu ứng solar flares
+		// Create solar flares particle system
+		// Reduce particle count based on number of windows for performance
+		const windowCount = windowManager ? windowManager.getWindows().length : 1;
+		const flareCount = Math.max(200, 1000 - (windowCount * 100));
+		const flareGeometry = new t.BufferGeometry();
+		const flarePositions = new Float32Array(flareCount * 3);
+		const flareVelocities = new Float32Array(flareCount * 3);
+		const flareLifetimes = new Float32Array(flareCount);
+		
+		for (let i = 0; i < flareCount; i++) {
+			// Start at sun surface
+			const theta = Math.random() * Math.PI * 2;
+			const phi = Math.acos(2 * Math.random() - 1);
+			const r = 60;
+			
+			flarePositions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+			flarePositions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+			flarePositions[i * 3 + 2] = r * Math.cos(phi);
+			
+			// Outward velocity
+			flareVelocities[i * 3] = flarePositions[i * 3] / r * (10 + Math.random() * 20);
+			flareVelocities[i * 3 + 1] = flarePositions[i * 3 + 1] / r * (10 + Math.random() * 20);
+			flareVelocities[i * 3 + 2] = flarePositions[i * 3 + 2] / r * (10 + Math.random() * 20);
+			
+			flareLifetimes[i] = Math.random();
+		}
+		
+		flareGeometry.setAttribute('position', new t.BufferAttribute(flarePositions, 3));
+		flareGeometry.setAttribute('velocity', new t.BufferAttribute(flareVelocities, 3));
+		flareGeometry.setAttribute('lifetime', new t.BufferAttribute(flareLifetimes, 1));
+		
+		const flareMaterial = new t.PointsMaterial({
+			color: 0xFFEE00,
+			size: 3,
+			transparent: true,
+			opacity: 0.8,
+			blending: t.AdditiveBlending,
+			vertexColors: false
+		});
+		
+		solarFlares = new t.Points(flareGeometry, flareMaterial);
+		solarFlares.position.copy(sun.position);
+		*/
 		
 		// Add all to world
 		world.add(sunCorona);
 		world.add(sunGlow);
 		world.add(sun);
+		world.add(sunLabel);
+		// world.add(solarFlares); // Đã bỏ hiệu ứng flare
 	}
 
 	function updateSolarSystem ()
@@ -672,9 +913,14 @@ else
 			world.remove(sun);
 			world.remove(sunGlow);
 			world.remove(sunCorona);
+			if (sun.userData.label) {
+				world.remove(sun.userData.label);
+			}
+			// world.remove(solarFlares); // Đã bỏ hiệu ứng flare
 			sun = null;
 			sunGlow = null;
 			sunCorona = null;
+			// solarFlares = null; // Đã bỏ hiệu ứng flare
 		}
 		
 		// Remove all planets
@@ -694,10 +940,10 @@ else
 			createSun();
 			createOrbits();
 			
-			// Initial position sun at the center of the first window's viewport
+			// Position sun at the center of the first window
 			let firstWin = wins[0];
-			let sunX = firstWin.shape.x + (firstWin.shape.w * .5);
-			let sunY = firstWin.shape.y + (firstWin.shape.h * .5);
+			let sunX = firstWin.shape.x + (firstWin.shape.w * .5) + sunUserOffset.x;
+			let sunY = firstWin.shape.y + (firstWin.shape.h * .5) + sunUserOffset.y;
 			
 			sun.position.x = sunX;
 			sun.position.y = sunY;
@@ -705,12 +951,8 @@ else
 			sunGlow.position.y = sunY;
 			sunCorona.position.x = sunX;
 			sunCorona.position.y = sunY;
-			
-			// Update sun light position
-			if (scene.userData.sunLight) {
-				scene.userData.sunLight.position.x = sunX;
-				scene.userData.sunLight.position.y = sunY;
-			}
+			// solarFlares.position.x = sunX; // Đã bỏ hiệu ứng flare
+			// solarFlares.position.y = sunY; // Đã bỏ hiệu ứng flare
 			
 			// Position orbits at sun position
 			orbits.forEach((orbit) => {
@@ -725,7 +967,7 @@ else
 				
 				// Calculate initial position on orbit
 				// Use a consistent starting angle based on current time for sync across windows
-				const baseAngle = (getTime() * 0.03) / planetInfo.orbitalPeriod;
+				const baseAngle = (getTime() * 0.1) / planetInfo.orbitalPeriod;
 				planet.userData.angle = baseAngle % (Math.PI * 2);
 				
 				const angle = planet.userData.angle;
@@ -776,25 +1018,24 @@ else
 
 		// Update sun position and animations if it exists
 		if (sun && wins.length > 0) {
-			// Always update sun position based on first window center
 			let firstWin = wins[0];
-			let sunTargetX = firstWin.shape.x + (firstWin.shape.w * .5);
-			let sunTargetY = firstWin.shape.y + (firstWin.shape.h * .5);
+			let sunTargetX = firstWin.shape.x + (firstWin.shape.w * .5) + sunUserOffset.x;
+			let sunTargetY = firstWin.shape.y + (firstWin.shape.h * .5) + sunUserOffset.y;
 			
-			// Update sun position smoothly to follow first window
+			// Smooth position update for sun
 			sun.position.x = sun.position.x + (sunTargetX - sun.position.x) * falloff;
 			sun.position.y = sun.position.y + (sunTargetY - sun.position.y) * falloff;
-			
-			// Update all sun-related objects to follow
 			sunGlow.position.x = sun.position.x;
 			sunGlow.position.y = sun.position.y;
 			sunCorona.position.x = sun.position.x;
 			sunCorona.position.y = sun.position.y;
+			// solarFlares.position.x = sun.position.x; // Đã bỏ hiệu ứng flare
+			// solarFlares.position.y = sun.position.y; // Đã bỏ hiệu ứng flare
 			
-			// Update sun light position
-			if (scene.userData.sunLight) {
-				scene.userData.sunLight.position.x = sun.position.x;
-				scene.userData.sunLight.position.y = sun.position.y;
+			// Update sun label position
+			if (sun.userData.label) {
+				sun.userData.label.position.x = sun.position.x;
+				sun.userData.label.position.y = sun.position.y + 80;
 			}
 			
 			// Animate sun rotation
@@ -806,13 +1047,62 @@ else
 			
 			let glowPulse = Math.sin(t * 3) * 0.1 + 1.1;
 			sunGlow.scale.set(glowPulse, glowPulse, glowPulse);
-			sunGlow.material.opacity = 1;
+			sunGlow.material.opacity = 0.4 + Math.sin(t * 4) * 0.1;
 			
 			let coronaPulse = Math.sin(t * 2.5) * 0.15 + 1.15;
 			sunCorona.scale.set(coronaPulse, coronaPulse, coronaPulse);
-			sunCorona.material.opacity = 1;
+			sunCorona.material.opacity = 0.2 + Math.sin(t * 3.5) * 0.05;
 			
-			// Update orbit positions to follow sun's current position
+			/* Đã bỏ hiệu ứng solar flares
+			// Animate solar flares
+			let flarePositions = solarFlares.geometry.attributes.position.array;
+			let flareVelocities = solarFlares.geometry.attributes.velocity.array;
+			let flareLifetimes = solarFlares.geometry.attributes.lifetime.array;
+			
+			for (let i = 0; i < flarePositions.length / 3; i++) {
+				let idx = i * 3;
+				
+				// Update positions
+				flarePositions[idx] += flareVelocities[idx] * 0.5;
+				flarePositions[idx + 1] += flareVelocities[idx + 1] * 0.5;
+				flarePositions[idx + 2] += flareVelocities[idx + 2] * 0.5;
+				
+				// Update lifetime
+				flareLifetimes[i] -= 0.01;
+				
+				// Reset if lifetime expired or too far from sun
+				let dx = flarePositions[idx] - sun.position.x;
+				let dy = flarePositions[idx + 1] - sun.position.y;
+				let dz = flarePositions[idx + 2];
+				let distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+				
+				if (flareLifetimes[i] <= 0 || distance > 200) {
+					// Reset to sun surface
+					let theta = Math.random() * Math.PI * 2;
+					let phi = Math.acos(2 * Math.random() - 1);
+					let r = 60;
+					
+					flarePositions[idx] = r * Math.sin(phi) * Math.cos(theta) + sun.position.x;
+					flarePositions[idx + 1] = r * Math.sin(phi) * Math.sin(theta) + sun.position.y;
+					flarePositions[idx + 2] = r * Math.cos(phi);
+					
+					// New velocity
+					flareVelocities[idx] = (flarePositions[idx] - sun.position.x) / r * (10 + Math.random() * 20);
+					flareVelocities[idx + 1] = (flarePositions[idx + 1] - sun.position.y) / r * (10 + Math.random() * 20);
+					flareVelocities[idx + 2] = flarePositions[idx + 2] / r * (10 + Math.random() * 20);
+					
+					flareLifetimes[i] = 1.0;
+				}
+			}
+			
+			solarFlares.geometry.attributes.position.needsUpdate = true;
+			solarFlares.geometry.attributes.lifetime.needsUpdate = true;
+			
+			// Rotate flares system
+			solarFlares.rotation.y = t * 0.02;
+			*/
+			
+			// Update orbit positions to follow sun
 			orbits.forEach((orbit) => {
 				orbit.position.x = sun.position.x;
 				orbit.position.y = sun.position.y;
@@ -822,16 +1112,16 @@ else
 			planets.forEach((planet, index) => {
 				const planetInfo = planetData[index];
 				
-				// Use time-based angle for perfect sync across windows
-				const baseAngle = (getTime() * 0.03) / planetInfo.orbitalPeriod;
-				planet.userData.angle = baseAngle % (Math.PI * 2);
-
+				// Update orbital angle based on orbital period
+				// Speed is scaled for visible motion (real periods would be too slow)
+				const orbitalSpeed = (1 / planetInfo.orbitalPeriod) * 0.01;
+				planet.userData.angle += orbitalSpeed;
 				
 				const angle = planet.userData.angle;
 				const semiMajorAxis = planetInfo.semiMajorAxis;
 				const semiMinorAxis = semiMajorAxis * Math.sqrt(1 - planetInfo.eccentricity * planetInfo.eccentricity);
 				
-				// Calculate position on elliptical orbit based on sun's current position
+				// Calculate position on elliptical orbit
 				planet.position.x = sun.position.x + semiMajorAxis * Math.cos(angle);
 				planet.position.y = sun.position.y + semiMinorAxis * Math.sin(angle);
 				
@@ -855,8 +1145,8 @@ else
 				// Update moon position for Earth
 				if (planet.userData.moon) {
 					const moonAngle = t * 0.1; // Moon orbits faster
-					planet.userData.moon.position.x = 22.5 * Math.cos(moonAngle);
-					planet.userData.moon.position.z = 22.5 * Math.sin(moonAngle);
+					planet.userData.moon.position.x = 25 * Math.cos(moonAngle);
+					planet.userData.moon.position.z = 25 * Math.sin(moonAngle);
 				}
 				
 				// Rotate rings with planet

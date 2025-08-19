@@ -148,4 +148,5 @@ class WindowManager
 	}
 }
 
-export default WindowManager;
+// Export for non-module usage
+window.WindowManager = WindowManager;
