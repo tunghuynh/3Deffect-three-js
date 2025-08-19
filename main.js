@@ -9,7 +9,7 @@ let pixR = window.devicePixelRatio ? window.devicePixelRatio : 1;
 let sun;
 let sunGlow;
 let sunCorona;
-// let solarFlares; // Đã bỏ hiệu ứng flare
+let solarFlares; // Thêm lại hiệu ứng flare
 let planets = [];
 let orbits = [];
 let sceneOffsetTarget = {x: 0, y: 0};
@@ -139,15 +139,15 @@ else
 		scene = new t.Scene();
 		
 		// Add lighting for 3D effect
-		const ambientLight = new t.AmbientLight(0xffffff, 0.8); // Brighter ambient light
+		const ambientLight = new t.AmbientLight(0xffffff, 0.65); // Medium ambient light
 		scene.add(ambientLight);
 		
-		const directionalLight = new t.DirectionalLight(0xffffff, 1.5);
+		const directionalLight = new t.DirectionalLight(0xffffff, 1.25);
 		directionalLight.position.set(100, 100, 50);
 		scene.add(directionalLight);
 		
 		// Add another directional light from opposite side for better illumination
-		const directionalLight2 = new t.DirectionalLight(0xffffff, 0.8);
+		const directionalLight2 = new t.DirectionalLight(0xffffff, 0.6);
 		directionalLight2.position.set(-100, -100, -50);
 		scene.add(directionalLight2);
 		
@@ -216,8 +216,14 @@ else
 		renderer.domElement.addEventListener('click', (e) => {
 			if (!sun) return;
 			
-			const mouseX = e.clientX;
-			const mouseY = window.innerHeight - e.clientY; // Flip Y coordinate
+			// Get mouse position relative to window
+			const rect = renderer.domElement.getBoundingClientRect();
+			const mouseX = e.clientX - rect.left;
+			const mouseY = e.clientY - rect.top;
+			
+			// Convert to world coordinates (considering orthographic camera)
+			const worldX = mouseX + window.screenX;
+			const worldY = window.screenY + (window.innerHeight - mouseY);
 			
 			// Get first window position
 			let wins = windowManager.getWindows();
@@ -228,8 +234,8 @@ else
 				const windowCenterX = firstWin.shape.x + (firstWin.shape.w * 0.5);
 				const windowCenterY = firstWin.shape.y + (firstWin.shape.h * 0.5);
 				
-				sunUserOffset.x = mouseX - windowCenterX;
-				sunUserOffset.y = mouseY - windowCenterY;
+				sunUserOffset.x = worldX - windowCenterX;
+				sunUserOffset.y = worldY - windowCenterY;
 				
 				// Save to localStorage to sync with other windows
 				localStorage.setItem('sunUserOffset', JSON.stringify(sunUserOffset));
@@ -352,7 +358,10 @@ else
 			orbitalPeriod: 84.01,
 			rotationPeriod: -0.72, // Negative = retrograde
 			axialTilt: 82.2,
-			hasRings: false  // Bỏ vành đai của Uranus
+			hasRings: true,
+			ringInnerRadius: 38,  // Nhỏ hơn Saturn nhiều
+			ringOuterRadius: 48,  // Nhỏ hơn Saturn nhiều
+			ringColor: 0x668899
 		},
 		{
 			name: "Neptune",
@@ -1196,15 +1205,14 @@ else
 		sunLabel.position.z = 10; // Slightly forward
 		sun.userData.label = sunLabel;
 		
-		/* Đã bỏ hiệu ứng solar flares
-		// Create solar flares particle system
-		// Reduce particle count based on number of windows for performance
+		// Create solar flares particle system with limited range
 		const windowCount = windowManager ? windowManager.getWindows().length : 1;
-		const flareCount = Math.max(200, 1000 - (windowCount * 100));
+		const flareCount = Math.max(100, 500 - (windowCount * 50)); // Reduced count
 		const flareGeometry = new t.BufferGeometry();
 		const flarePositions = new Float32Array(flareCount * 3);
 		const flareVelocities = new Float32Array(flareCount * 3);
 		const flareLifetimes = new Float32Array(flareCount);
+		const flareSizes = new Float32Array(flareCount);
 		
 		for (let i = 0; i < flareCount; i++) {
 			// Start at sun surface
@@ -1216,30 +1224,47 @@ else
 			flarePositions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
 			flarePositions[i * 3 + 2] = r * Math.cos(phi);
 			
-			// Outward velocity
-			flareVelocities[i * 3] = flarePositions[i * 3] / r * (10 + Math.random() * 20);
-			flareVelocities[i * 3 + 1] = flarePositions[i * 3 + 1] / r * (10 + Math.random() * 20);
-			flareVelocities[i * 3 + 2] = flarePositions[i * 3 + 2] / r * (10 + Math.random() * 20);
+			// Reduced outward velocity for smaller flares
+			flareVelocities[i * 3] = flarePositions[i * 3] / r * (5 + Math.random() * 10);
+			flareVelocities[i * 3 + 1] = flarePositions[i * 3 + 1] / r * (5 + Math.random() * 10);
+			flareVelocities[i * 3 + 2] = flarePositions[i * 3 + 2] / r * (5 + Math.random() * 10);
 			
 			flareLifetimes[i] = Math.random();
+			flareSizes[i] = Math.random() * 4 + 2; // Random sizes
 		}
 		
 		flareGeometry.setAttribute('position', new t.BufferAttribute(flarePositions, 3));
 		flareGeometry.setAttribute('velocity', new t.BufferAttribute(flareVelocities, 3));
 		flareGeometry.setAttribute('lifetime', new t.BufferAttribute(flareLifetimes, 1));
+		flareGeometry.setAttribute('size', new t.BufferAttribute(flareSizes, 1));
+		
+		// Create gradient texture for flame colors
+		const flareCanvas = document.createElement('canvas');
+		flareCanvas.width = 64;
+		flareCanvas.height = 64;
+		const flareCtx = flareCanvas.getContext('2d');
+		const flareGradient = flareCtx.createRadialGradient(32, 32, 0, 32, 32, 32);
+		flareGradient.addColorStop(0, 'rgba(255,255,255,1)');
+		flareGradient.addColorStop(0.2, 'rgba(255,255,0,1)');
+		flareGradient.addColorStop(0.4, 'rgba(255,200,0,0.8)');
+		flareGradient.addColorStop(0.7, 'rgba(255,100,0,0.4)');
+		flareGradient.addColorStop(1, 'rgba(255,0,0,0)');
+		flareCtx.fillStyle = flareGradient;
+		flareCtx.fillRect(0, 0, 64, 64);
+		const flareTexture = new t.CanvasTexture(flareCanvas);
 		
 		const flareMaterial = new t.PointsMaterial({
-			color: 0xFFEE00,
-			size: 3,
+			map: flareTexture,
+			size: 6,
 			transparent: true,
-			opacity: 0.8,
+			opacity: 0.9,
 			blending: t.AdditiveBlending,
-			vertexColors: false
+			depthWrite: false,
+			sizeAttenuation: true
 		});
 		
 		solarFlares = new t.Points(flareGeometry, flareMaterial);
 		solarFlares.position.copy(sun.position);
-		*/
 		
 		// Add all to world
 		// Bỏ vòng sáng xung quanh mặt trời theo yêu cầu
@@ -1247,7 +1272,7 @@ else
 		// world.add(sunGlow);
 		world.add(sun);
 		world.add(sunLabel);
-		// world.add(solarFlares); // Đã bỏ hiệu ứng flare
+		world.add(solarFlares); // Thêm lại hiệu ứng flare với phạm vi giới hạn
 	}
 
 	function updateSolarSystem ()
@@ -1262,11 +1287,11 @@ else
 			if (sun.userData.label) {
 				world.remove(sun.userData.label);
 			}
-			// world.remove(solarFlares); // Đã bỏ hiệu ứng flare
+			world.remove(solarFlares);
 			sun = null;
 			// sunGlow = null;
 			// sunCorona = null;
-			// solarFlares = null; // Đã bỏ hiệu ứng flare
+			solarFlares = null;
 		}
 		
 		// Remove all planets
@@ -1375,8 +1400,8 @@ else
 			// sunGlow.position.y = sun.position.y;
 			// sunCorona.position.x = sun.position.x;
 			// sunCorona.position.y = sun.position.y;
-			// solarFlares.position.x = sun.position.x; // Đã bỏ hiệu ứng flare
-			// solarFlares.position.y = sun.position.y; // Đã bỏ hiệu ứng flare
+			solarFlares.position.x = sun.position.x;
+			solarFlares.position.y = sun.position.y;
 			
 			// Update sun label position
 			if (sun.userData.label) {
@@ -1401,8 +1426,7 @@ else
 			// sunCorona.scale.set(coronaPulse, coronaPulse, coronaPulse);
 			// sunCorona.material.opacity = 0.2 + Math.sin(t * 3.5) * 0.05;
 			
-			/* Đã bỏ hiệu ứng solar flares
-			// Animate solar flares
+			// Animate solar flares with limited range
 			let flarePositions = solarFlares.geometry.attributes.position.array;
 			let flareVelocities = solarFlares.geometry.attributes.velocity.array;
 			let flareLifetimes = solarFlares.geometry.attributes.lifetime.array;
@@ -1410,21 +1434,21 @@ else
 			for (let i = 0; i < flarePositions.length / 3; i++) {
 				let idx = i * 3;
 				
-				// Update positions
-				flarePositions[idx] += flareVelocities[idx] * 0.5;
-				flarePositions[idx + 1] += flareVelocities[idx + 1] * 0.5;
-				flarePositions[idx + 2] += flareVelocities[idx + 2] * 0.5;
+				// Update positions with slower speed
+				flarePositions[idx] += flareVelocities[idx] * 0.3;
+				flarePositions[idx + 1] += flareVelocities[idx + 1] * 0.3;
+				flarePositions[idx + 2] += flareVelocities[idx + 2] * 0.3;
 				
 				// Update lifetime
-				flareLifetimes[i] -= 0.01;
+				flareLifetimes[i] -= 0.015;
 				
-				// Reset if lifetime expired or too far from sun
+				// Reset if lifetime expired or too far from sun (limited to 80 to stay within Mercury orbit)
 				let dx = flarePositions[idx] - sun.position.x;
 				let dy = flarePositions[idx + 1] - sun.position.y;
 				let dz = flarePositions[idx + 2];
 				let distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
 				
-				if (flareLifetimes[i] <= 0 || distance > 200) {
+				if (flareLifetimes[i] <= 0 || distance > 80) {
 					// Reset to sun surface
 					let theta = Math.random() * Math.PI * 2;
 					let phi = Math.acos(2 * Math.random() - 1);
@@ -1434,10 +1458,10 @@ else
 					flarePositions[idx + 1] = r * Math.sin(phi) * Math.sin(theta) + sun.position.y;
 					flarePositions[idx + 2] = r * Math.cos(phi);
 					
-					// New velocity
-					flareVelocities[idx] = (flarePositions[idx] - sun.position.x) / r * (10 + Math.random() * 20);
-					flareVelocities[idx + 1] = (flarePositions[idx + 1] - sun.position.y) / r * (10 + Math.random() * 20);
-					flareVelocities[idx + 2] = flarePositions[idx + 2] / r * (10 + Math.random() * 20);
+					// New velocity (reduced speed)
+					flareVelocities[idx] = (flarePositions[idx] - sun.position.x) / r * (5 + Math.random() * 10);
+					flareVelocities[idx + 1] = (flarePositions[idx + 1] - sun.position.y) / r * (5 + Math.random() * 10);
+					flareVelocities[idx + 2] = flarePositions[idx + 2] / r * (5 + Math.random() * 10);
 					
 					flareLifetimes[i] = 1.0;
 				}
@@ -1446,9 +1470,8 @@ else
 			solarFlares.geometry.attributes.position.needsUpdate = true;
 			solarFlares.geometry.attributes.lifetime.needsUpdate = true;
 			
-			// Rotate flares system
-			solarFlares.rotation.y = t * 0.02;
-			*/
+			// Rotate flares system slowly
+			solarFlares.rotation.y = t * 0.01;
 			
 			// Update orbit positions to follow sun
 			orbits.forEach((orbit) => {
