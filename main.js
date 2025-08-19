@@ -21,6 +21,7 @@ let isDragging = false;
 let dragOffset = {x: 0, y: 0};
 let sunUserOffset = {x: 0, y: 0}; // User-defined offset from drag
 let mouseStart = {x: 0, y: 0};
+let sunAbsolutePosition = null; // Absolute position of sun in screen coordinates
 
 let today = new Date();
 today.setHours(0);
@@ -66,10 +67,10 @@ else
 	{
 		initialized = true;
 
-		// Load sun offset from localStorage if exists
-		const savedOffset = localStorage.getItem('sunUserOffset');
-		if (savedOffset) {
-			sunUserOffset = JSON.parse(savedOffset);
+		// Load sun absolute position from localStorage if exists
+		const savedPosition = localStorage.getItem('sunAbsolutePosition');
+		if (savedPosition) {
+			sunAbsolutePosition = JSON.parse(savedPosition);
 		}
 
 		// add a short timeout because window.offsetX reports wrong values before a short period 
@@ -205,10 +206,10 @@ else
 	}
 
 	function setupMouseEvents() {
-		// Listen for storage changes to sync sun offset between windows
+		// Listen for storage changes to sync sun position between windows
 		window.addEventListener('storage', (event) => {
-			if (event.key === 'sunUserOffset' && event.newValue) {
-				sunUserOffset = JSON.parse(event.newValue);
+			if (event.key === 'sunAbsolutePosition' && event.newValue) {
+				sunAbsolutePosition = JSON.parse(event.newValue);
 			}
 		});
 
@@ -216,26 +217,18 @@ else
 		renderer.domElement.addEventListener('click', (e) => {
 			if (!sun) return;
 			
-			// Get click position in screen coordinates
+			// Get click position in screen coordinates (absolute position)
 			const clickX = e.clientX + window.screenX;
 			const clickY = e.clientY + window.screenY;
 			
-			// Get first window position
-			let wins = windowManager.getWindows();
-			if (wins.length > 0) {
-				let firstWin = wins[0];
-				
-				// Calculate new offset relative to first window center
-				const windowCenterX = firstWin.shape.x + (firstWin.shape.w * 0.5);
-				const windowCenterY = firstWin.shape.y + (firstWin.shape.h * 0.5);
-				
-				// Calculate offset
-				sunUserOffset.x = clickX - windowCenterX;
-				sunUserOffset.y = clickY - windowCenterY;
-				
-				// Save to localStorage to sync with other windows
-				localStorage.setItem('sunUserOffset', JSON.stringify(sunUserOffset));
-			}
+			// Update absolute position
+			sunAbsolutePosition = {
+				x: clickX,
+				y: clickY
+			};
+			
+			// Save to localStorage to sync with other windows
+			localStorage.setItem('sunAbsolutePosition', JSON.stringify(sunAbsolutePosition));
 		});
 
 		// Change cursor to pointer on hover
@@ -1309,10 +1302,18 @@ else
 			createSun();
 			createOrbits();
 			
-			// Position sun at the center of the first window
-			let firstWin = wins[0];
-			let sunX = firstWin.shape.x + (firstWin.shape.w * .5) + sunUserOffset.x;
-			let sunY = firstWin.shape.y + (firstWin.shape.h * .5) + sunUserOffset.y;
+			// Position sun - if absolute position is set, use it
+			let sunX, sunY;
+			if (sunAbsolutePosition) {
+				// Use absolute position
+				sunX = sunAbsolutePosition.x;
+				sunY = sunAbsolutePosition.y;
+			} else {
+				// Default to center of first window
+				let firstWin = wins[0];
+				sunX = firstWin.shape.x + (firstWin.shape.w * .5);
+				sunY = firstWin.shape.y + (firstWin.shape.h * .5);
+			}
 			
 			sun.position.x = sunX;
 			sun.position.y = sunY;
@@ -1387,9 +1388,18 @@ else
 
 		// Update sun position and animations if it exists
 		if (sun && wins.length > 0) {
-			let firstWin = wins[0];
-			let sunTargetX = firstWin.shape.x + (firstWin.shape.w * .5) + sunUserOffset.x;
-			let sunTargetY = firstWin.shape.y + (firstWin.shape.h * .5) + sunUserOffset.y;
+			let sunTargetX, sunTargetY;
+			
+			if (sunAbsolutePosition) {
+				// Use absolute position
+				sunTargetX = sunAbsolutePosition.x;
+				sunTargetY = sunAbsolutePosition.y;
+			} else {
+				// Default to center of first window
+				let firstWin = wins[0];
+				sunTargetX = firstWin.shape.x + (firstWin.shape.w * .5);
+				sunTargetY = firstWin.shape.y + (firstWin.shape.h * .5);
+			}
 			
 			// Smooth position update for sun
 			sun.position.x = sun.position.x + (sunTargetX - sun.position.x) * falloff;
