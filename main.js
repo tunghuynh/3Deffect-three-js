@@ -9,7 +9,7 @@ let pixR = window.devicePixelRatio ? window.devicePixelRatio : 1;
 let sun;
 let sunGlow;
 let sunCorona;
-let solarFlares; // Thêm lại hiệu ứng flare
+// let solarFlares; // Đã bỏ hiệu ứng flare
 let planets = [];
 let orbits = [];
 let sceneOffsetTarget = {x: 0, y: 0};
@@ -216,14 +216,9 @@ else
 		renderer.domElement.addEventListener('click', (e) => {
 			if (!sun) return;
 			
-			// Get mouse position relative to window
-			const rect = renderer.domElement.getBoundingClientRect();
-			const mouseX = e.clientX - rect.left;
-			const mouseY = e.clientY - rect.top;
-			
-			// Convert to world coordinates (considering orthographic camera)
-			const worldX = mouseX + window.screenX;
-			const worldY = window.screenY + (window.innerHeight - mouseY);
+			// Get click position in screen coordinates
+			const clickX = e.clientX + window.screenX;
+			const clickY = e.clientY + window.screenY;
 			
 			// Get first window position
 			let wins = windowManager.getWindows();
@@ -234,8 +229,9 @@ else
 				const windowCenterX = firstWin.shape.x + (firstWin.shape.w * 0.5);
 				const windowCenterY = firstWin.shape.y + (firstWin.shape.h * 0.5);
 				
-				sunUserOffset.x = worldX - windowCenterX;
-				sunUserOffset.y = worldY - windowCenterY;
+				// Calculate offset
+				sunUserOffset.x = clickX - windowCenterX;
+				sunUserOffset.y = clickY - windowCenterY;
 				
 				// Save to localStorage to sync with other windows
 				localStorage.setItem('sunUserOffset', JSON.stringify(sunUserOffset));
@@ -1205,6 +1201,7 @@ else
 		sunLabel.position.z = 10; // Slightly forward
 		sun.userData.label = sunLabel;
 		
+		/* Đã bỏ hiệu ứng solar flares theo yêu cầu
 		// Create solar flares particle system with limited range
 		const windowCount = windowManager ? windowManager.getWindows().length : 1;
 		const flareCount = Math.max(100, 500 - (windowCount * 50)); // Reduced count
@@ -1265,6 +1262,7 @@ else
 		
 		solarFlares = new t.Points(flareGeometry, flareMaterial);
 		solarFlares.position.copy(sun.position);
+		*/
 		
 		// Add all to world
 		// Bỏ vòng sáng xung quanh mặt trời theo yêu cầu
@@ -1272,7 +1270,7 @@ else
 		// world.add(sunGlow);
 		world.add(sun);
 		world.add(sunLabel);
-		world.add(solarFlares); // Thêm lại hiệu ứng flare với phạm vi giới hạn
+		// world.add(solarFlares); // Đã bỏ hiệu ứng flare theo yêu cầu
 	}
 
 	function updateSolarSystem ()
@@ -1287,11 +1285,11 @@ else
 			if (sun.userData.label) {
 				world.remove(sun.userData.label);
 			}
-			world.remove(solarFlares);
+			// world.remove(solarFlares); // Đã bỏ hiệu ứng flare
 			sun = null;
 			// sunGlow = null;
 			// sunCorona = null;
-			solarFlares = null;
+			// solarFlares = null; // Đã bỏ hiệu ứng flare
 		}
 		
 		// Remove all planets
@@ -1400,8 +1398,8 @@ else
 			// sunGlow.position.y = sun.position.y;
 			// sunCorona.position.x = sun.position.x;
 			// sunCorona.position.y = sun.position.y;
-			solarFlares.position.x = sun.position.x;
-			solarFlares.position.y = sun.position.y;
+			// solarFlares.position.x = sun.position.x; // Đã bỏ hiệu ứng flare
+			// solarFlares.position.y = sun.position.y; // Đã bỏ hiệu ứng flare
 			
 			// Update sun label position
 			if (sun.userData.label) {
@@ -1426,6 +1424,7 @@ else
 			// sunCorona.scale.set(coronaPulse, coronaPulse, coronaPulse);
 			// sunCorona.material.opacity = 0.2 + Math.sin(t * 3.5) * 0.05;
 			
+			/* Đã bỏ hiệu ứng solar flares theo yêu cầu
 			// Animate solar flares with limited range
 			let flarePositions = solarFlares.geometry.attributes.position.array;
 			let flareVelocities = solarFlares.geometry.attributes.velocity.array;
@@ -1472,6 +1471,7 @@ else
 			
 			// Rotate flares system slowly
 			solarFlares.rotation.y = t * 0.01;
+			*/
 			
 			// Update orbit positions to follow sun
 			orbits.forEach((orbit) => {
