@@ -6,6 +6,7 @@ let scene, camera, renderer;
 let windowManager;
 let starField1, starField2, nebulaPlanes = [];
 let sun, sunGlow1, sunGlow2, sunGlow3;
+let solarFlares = [];
 let planets = [];
 let orbits = [];
 let labels = [];
@@ -576,6 +577,107 @@ function createSun() {
     sunGlow3 = new THREE.Mesh(glowGeometry3, glowMaterial3);
     sunGlow3.position.copy(sunPosition);
     scene.add(sunGlow3);
+    
+    // Create solar flares
+    createSolarFlares();
+}
+
+// Create solar flares particle system
+function createSolarFlares() {
+    // Create multiple flare systems for variety
+    for (let i = 0; i < 3; i++) {
+        const flareGeometry = new THREE.BufferGeometry();
+        const flareCount = 50;
+        const positions = new Float32Array(flareCount * 3);
+        const velocities = new Float32Array(flareCount * 3);
+        const sizes = new Float32Array(flareCount);
+        const lifetimes = new Float32Array(flareCount);
+        
+        // Initialize particles
+        for (let j = 0; j < flareCount; j++) {
+            resetFlareParticle(positions, velocities, sizes, lifetimes, j);
+        }
+        
+        flareGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        flareGeometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+        
+        // Custom shader for flares
+        const flareMaterial = new THREE.ShaderMaterial({
+            uniforms: {
+                time: { value: 0 },
+                texture: { value: new THREE.TextureLoader().load('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAFxJREFUeNpifP78OQMDAwMTAwMDSA7IZOAT+A8lkBXA2EyMjIz/GRn/I8sxQAUZIApAikAKYApgCkAKYApACkAKYApACkAKYApACmAKYApiCjBMG4aOgQcDBBgAmEMIaJcJq2UAAAAASUVORK5CYII=') },
+                baseColor: { value: new THREE.Color(0xFFD700) },
+                glowColor: { value: new THREE.Color(0xFF4500) }
+            },
+            vertexShader: `
+                attribute float size;
+                varying float vAlpha;
+                varying vec3 vColor;
+                uniform float time;
+                
+                void main() {
+                    vAlpha = size / 10.0;
+                    vColor = mix(vec3(1.0, 0.8, 0.0), vec3(1.0, 0.4, 0.0), sin(time + position.x));
+                    
+                    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                    gl_PointSize = size * (300.0 / -mvPosition.z);
+                    gl_Position = projectionMatrix * mvPosition;
+                }
+            `,
+            fragmentShader: `
+                uniform sampler2D texture;
+                varying float vAlpha;
+                varying vec3 vColor;
+                
+                void main() {
+                    vec4 texColor = texture2D(texture, gl_PointCoord);
+                    gl_FragColor = vec4(vColor, vAlpha) * texColor;
+                }
+            `,
+            blending: THREE.AdditiveBlending,
+            depthTest: false,
+            transparent: true
+        });
+        
+        const flareSystem = new THREE.Points(flareGeometry, flareMaterial);
+        flareSystem.userData = {
+            velocities: velocities,
+            lifetimes: lifetimes,
+            basePositions: positions.slice(),
+            index: i
+        };
+        
+        scene.add(flareSystem);
+        solarFlares.push(flareSystem);
+    }
+}
+
+// Reset individual flare particle
+function resetFlareParticle(positions, velocities, sizes, lifetimes, index) {
+    const i3 = index * 3;
+    
+    // Start position on sun surface
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    const radius = 60; // Sun radius
+    
+    positions[i3] = radius * Math.sin(phi) * Math.cos(theta);
+    positions[i3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
+    positions[i3 + 2] = radius * Math.cos(phi);
+    
+    // Random ejection velocity
+    const speed = 0.5 + Math.random() * 2;
+    const ejectAngle = Math.random() * 0.3; // Small angle from surface normal
+    
+    velocities[i3] = positions[i3] / radius * speed + (Math.random() - 0.5) * ejectAngle;
+    velocities[i3 + 1] = positions[i3 + 1] / radius * speed + (Math.random() - 0.5) * ejectAngle;
+    velocities[i3 + 2] = positions[i3 + 2] / radius * speed + (Math.random() - 0.5) * ejectAngle;
+    
+    // Random size
+    sizes[index] = Math.random() * 5 + 2;
+    
+    // Random lifetime
+    lifetimes[index] = Math.random() * 2 + 1;
 }
 
 // Create orbital paths for all planets
@@ -661,44 +763,393 @@ function createPlanet(data, index) {
     };
     
     // Create planet sphere
-    const geometry = new THREE.SphereGeometry(data.radius, 32, 32);
+    const geometry = new THREE.SphereGeometry(data.radius, 64, 64);
     
     // Create material based on planet properties
     let material;
     
-    if (data.name === "Earth") {
-        // Earth with blue oceans and green/brown continents
+    if (data.name === "Mercury") {
+        // Mercury - cratered gray surface
         material = new THREE.MeshPhongMaterial({
-            color: data.color,
-            shininess: 10,
-            specular: 0x222222
+            color: 0x8C7853,
+            bumpScale: 0.05,
+            shininess: 5,
+            specular: 0x111111
         });
-    } else if (data.name === "Jupiter") {
-        // Jupiter with bands
+        // Add procedural craters
+        material.onBeforeCompile = (shader) => {
+            shader.fragmentShader = shader.fragmentShader.replace(
+                '#include <color_fragment>',
+                `
+                #include <color_fragment>
+                vec2 uv = vUv * 30.0;
+                float crater = 0.0;
+                for(int i = 0; i < 5; i++) {
+                    vec2 pos = vec2(sin(float(i) * 1.7), cos(float(i) * 2.3)) * 10.0;
+                    float dist = distance(uv, pos);
+                    crater += smoothstep(1.0, 0.0, dist) * 0.1;
+                }
+                diffuseColor.rgb *= 1.0 - crater * 0.3;
+                `
+            );
+        };
+    } else if (data.name === "Venus") {
+        // Venus - thick yellowish atmosphere
         material = new THREE.ShaderMaterial({
             uniforms: {
                 time: { value: 0 },
-                colorA: { value: new THREE.Color(0xD4A76A) },
-                colorB: { value: new THREE.Color(0x8B7355) },
-                colorC: { value: new THREE.Color(0xCD853F) }
+                atmosphereColor: { value: new THREE.Color(0xFFC649) },
+                surfaceColor: { value: new THREE.Color(0xE8B547) }
             },
             vertexShader: `
+                varying vec3 vNormal;
                 varying vec2 vUv;
                 void main() {
                     vUv = uv;
+                    vNormal = normalize(normalMatrix * normal);
                     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
                 }
             `,
             fragmentShader: `
                 uniform float time;
-                uniform vec3 colorA;
-                uniform vec3 colorB;
-                uniform vec3 colorC;
+                uniform vec3 atmosphereColor;
+                uniform vec3 surfaceColor;
+                varying vec3 vNormal;
                 varying vec2 vUv;
                 
+                float noise(vec2 p) {
+                    return sin(p.x * 10.0) * sin(p.y * 10.0);
+                }
+                
                 void main() {
-                    float bands = sin(vUv.y * 20.0 + time * 0.1) * 0.5 + 0.5;
-                    vec3 color = mix(colorA, mix(colorB, colorC, bands), vUv.y);
+                    // Swirling cloud patterns
+                    vec2 uv = vUv;
+                    float clouds = noise(uv * 5.0 + vec2(time * 0.02, 0.0));
+                    clouds += noise(uv * 10.0 - vec2(0.0, time * 0.03)) * 0.5;
+                    clouds = smoothstep(0.0, 1.0, clouds * 0.5 + 0.5);
+                    
+                    vec3 color = mix(surfaceColor, atmosphereColor, clouds);
+                    
+                    // Atmospheric glow at edges
+                    float rim = 1.0 - dot(vNormal, vec3(0.0, 0.0, 1.0));
+                    color += atmosphereColor * pow(rim, 2.0) * 0.5;
+                    
+                    gl_FragColor = vec4(color, 1.0);
+                }
+            `
+        });
+    } else if (data.name === "Earth") {
+        // Earth - blue marble with continents
+        material = new THREE.ShaderMaterial({
+            uniforms: {
+                time: { value: 0 },
+                oceanColor: { value: new THREE.Color(0x006994) },
+                landColor: { value: new THREE.Color(0x2A5F1A) },
+                desertColor: { value: new THREE.Color(0xD2B48C) },
+                iceColor: { value: new THREE.Color(0xFFFFFF) }
+            },
+            vertexShader: `
+                varying vec3 vNormal;
+                varying vec2 vUv;
+                varying vec3 vPosition;
+                void main() {
+                    vUv = uv;
+                    vNormal = normalize(normalMatrix * normal);
+                    vPosition = position;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform float time;
+                uniform vec3 oceanColor;
+                uniform vec3 landColor;
+                uniform vec3 desertColor;
+                uniform vec3 iceColor;
+                varying vec3 vNormal;
+                varying vec2 vUv;
+                varying vec3 vPosition;
+                
+                float noise(vec2 p) {
+                    return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+                }
+                
+                void main() {
+                    vec2 uv = vUv;
+                    
+                    // Simple continent pattern
+                    float land = noise(uv * 4.0) * noise(uv * 8.0);
+                    land = smoothstep(0.3, 0.4, land);
+                    
+                    // Ice caps at poles
+                    float iceCap = smoothstep(0.7, 0.9, abs(vPosition.y) / 10.0);
+                    
+                    // Mix colors
+                    vec3 color = mix(oceanColor, landColor, land);
+                    color = mix(color, iceColor, iceCap);
+                    
+                    // Add specular for water
+                    float specular = pow(max(0.0, dot(vNormal, vec3(0.0, 0.0, 1.0))), 20.0);
+                    if(land < 0.5) color += vec3(specular * 0.5);
+                    
+                    // Atmosphere effect
+                    float rim = 1.0 - dot(vNormal, vec3(0.0, 0.0, 1.0));
+                    color += vec3(0.1, 0.3, 0.6) * pow(rim, 2.0) * 0.3;
+                    
+                    gl_FragColor = vec4(color, 1.0);
+                }
+            `
+        });
+    } else if (data.name === "Mars") {
+        // Mars - red planet with polar caps
+        material = new THREE.ShaderMaterial({
+            uniforms: {
+                time: { value: 0 },
+                baseColor: { value: new THREE.Color(0xCD5C5C) },
+                darkColor: { value: new THREE.Color(0x8B3626) },
+                iceColor: { value: new THREE.Color(0xF0E6DC) }
+            },
+            vertexShader: `
+                varying vec3 vNormal;
+                varying vec2 vUv;
+                varying vec3 vPosition;
+                void main() {
+                    vUv = uv;
+                    vNormal = normalize(normalMatrix * normal);
+                    vPosition = position;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform float time;
+                uniform vec3 baseColor;
+                uniform vec3 darkColor;
+                uniform vec3 iceColor;
+                varying vec3 vNormal;
+                varying vec2 vUv;
+                varying vec3 vPosition;
+                
+                float noise(vec2 p) {
+                    return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+                }
+                
+                void main() {
+                    vec2 uv = vUv;
+                    
+                    // Surface features
+                    float features = noise(uv * 10.0) * noise(uv * 20.0);
+                    vec3 color = mix(baseColor, darkColor, features);
+                    
+                    // Polar ice caps
+                    float iceCap = smoothstep(0.8, 0.95, abs(vPosition.y) / 5.3);
+                    color = mix(color, iceColor, iceCap);
+                    
+                    // Dust atmosphere
+                    float rim = 1.0 - dot(vNormal, vec3(0.0, 0.0, 1.0));
+                    color += baseColor * pow(rim, 3.0) * 0.2;
+                    
+                    gl_FragColor = vec4(color, 1.0);
+                }
+            `
+        });
+    } else if (data.name === "Jupiter") {
+        // Jupiter with Great Red Spot and bands
+        material = new THREE.ShaderMaterial({
+            uniforms: {
+                time: { value: 0 },
+                bandColor1: { value: new THREE.Color(0xE8D4A2) },
+                bandColor2: { value: new THREE.Color(0xC4915C) },
+                bandColor3: { value: new THREE.Color(0x8B6F47) },
+                stormColor: { value: new THREE.Color(0xCD5C5C) }
+            },
+            vertexShader: `
+                varying vec2 vUv;
+                varying vec3 vPosition;
+                void main() {
+                    vUv = uv;
+                    vPosition = position;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform float time;
+                uniform vec3 bandColor1;
+                uniform vec3 bandColor2;
+                uniform vec3 bandColor3;
+                uniform vec3 stormColor;
+                varying vec2 vUv;
+                varying vec3 vPosition;
+                
+                float noise(vec2 p) {
+                    return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+                }
+                
+                void main() {
+                    vec2 uv = vUv;
+                    
+                    // Animated bands
+                    float bands = sin((uv.y + time * 0.01) * 30.0) * 0.5 + 0.5;
+                    float turbulence = noise(vec2(uv.x * 20.0 + time * 0.02, uv.y * 10.0)) * 0.2;
+                    bands += turbulence;
+                    
+                    vec3 color = mix(bandColor1, bandColor2, bands);
+                    color = mix(color, bandColor3, smoothstep(0.3, 0.7, bands));
+                    
+                    // Great Red Spot
+                    vec2 spotCenter = vec2(0.3, 0.4);
+                    float spotDist = distance(uv, spotCenter);
+                    if(spotDist < 0.08) {
+                        float spotIntensity = 1.0 - smoothstep(0.0, 0.08, spotDist);
+                        float swirl = sin(spotDist * 50.0 - time * 2.0) * 0.5 + 0.5;
+                        color = mix(color, stormColor, spotIntensity * swirl);
+                    }
+                    
+                    gl_FragColor = vec4(color, 1.0);
+                }
+            `
+        });
+    } else if (data.name === "Saturn") {
+        // Saturn - pale gold with subtle bands
+        material = new THREE.ShaderMaterial({
+            uniforms: {
+                time: { value: 0 },
+                baseColor: { value: new THREE.Color(0xFAD5A5) },
+                bandColor: { value: new THREE.Color(0xE8C88C) }
+            },
+            vertexShader: `
+                varying vec2 vUv;
+                varying vec3 vNormal;
+                void main() {
+                    vUv = uv;
+                    vNormal = normalize(normalMatrix * normal);
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform float time;
+                uniform vec3 baseColor;
+                uniform vec3 bandColor;
+                varying vec2 vUv;
+                varying vec3 vNormal;
+                
+                void main() {
+                    vec2 uv = vUv;
+                    
+                    // Subtle bands
+                    float bands = sin(uv.y * 20.0) * 0.5 + 0.5;
+                    vec3 color = mix(baseColor, bandColor, bands * 0.3);
+                    
+                    // Hexagonal storm at north pole (simplified)
+                    if(uv.y > 0.9) {
+                        color *= 0.9;
+                    }
+                    
+                    // Soft glow
+                    float rim = 1.0 - dot(vNormal, vec3(0.0, 0.0, 1.0));
+                    color += baseColor * pow(rim, 3.0) * 0.1;
+                    
+                    gl_FragColor = vec4(color, 1.0);
+                }
+            `
+        });
+    } else if (data.name === "Uranus") {
+        // Uranus - pale blue-green
+        material = new THREE.ShaderMaterial({
+            uniforms: {
+                time: { value: 0 },
+                baseColor: { value: new THREE.Color(0x4FD0E0) },
+                cloudColor: { value: new THREE.Color(0x7FDBEF) }
+            },
+            vertexShader: `
+                varying vec2 vUv;
+                varying vec3 vNormal;
+                void main() {
+                    vUv = uv;
+                    vNormal = normalize(normalMatrix * normal);
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform float time;
+                uniform vec3 baseColor;
+                uniform vec3 cloudColor;
+                varying vec2 vUv;
+                varying vec3 vNormal;
+                
+                float noise(vec2 p) {
+                    return fract(sin(dot(p, vec2(45.234, 98.882))) * 43758.5453);
+                }
+                
+                void main() {
+                    vec2 uv = vUv;
+                    
+                    // Subtle cloud patterns
+                    float clouds = noise(uv * 8.0 + time * 0.01);
+                    vec3 color = mix(baseColor, cloudColor, clouds * 0.2);
+                    
+                    // Atmospheric haze
+                    float rim = 1.0 - dot(vNormal, vec3(0.0, 0.0, 1.0));
+                    color += cloudColor * pow(rim, 2.0) * 0.3;
+                    
+                    gl_FragColor = vec4(color, 1.0);
+                }
+            `
+        });
+    } else if (data.name === "Neptune") {
+        // Neptune - deep blue with storm features
+        material = new THREE.ShaderMaterial({
+            uniforms: {
+                time: { value: 0 },
+                baseColor: { value: new THREE.Color(0x3A5FCD) },
+                stormColor: { value: new THREE.Color(0x1E3A8A) },
+                cloudColor: { value: new THREE.Color(0x6495ED) }
+            },
+            vertexShader: `
+                varying vec2 vUv;
+                varying vec3 vNormal;
+                void main() {
+                    vUv = uv;
+                    vNormal = normalize(normalMatrix * normal);
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform float time;
+                uniform vec3 baseColor;
+                uniform vec3 stormColor;
+                uniform vec3 cloudColor;
+                varying vec2 vUv;
+                varying vec3 vNormal;
+                
+                float noise(vec2 p) {
+                    return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+                }
+                
+                void main() {
+                    vec2 uv = vUv;
+                    
+                    // Base color with variations
+                    vec3 color = baseColor;
+                    
+                    // Cloud bands
+                    float bands = sin(uv.y * 15.0 + time * 0.02) * 0.5 + 0.5;
+                    color = mix(color, cloudColor, bands * 0.3);
+                    
+                    // Great Dark Spot
+                    vec2 spotCenter = vec2(0.6, 0.5);
+                    float spotDist = distance(uv, spotCenter);
+                    if(spotDist < 0.06) {
+                        float intensity = 1.0 - smoothstep(0.0, 0.06, spotDist);
+                        color = mix(color, stormColor, intensity * 0.7);
+                    }
+                    
+                    // Wind streaks
+                    float streaks = noise(vec2(uv.x * 30.0 + time * 0.05, uv.y));
+                    color = mix(color, cloudColor, streaks * 0.1);
+                    
+                    // Atmosphere
+                    float rim = 1.0 - dot(vNormal, vec3(0.0, 0.0, 1.0));
+                    color += baseColor * pow(rim, 2.0) * 0.2;
+                    
                     gl_FragColor = vec4(color, 1.0);
                 }
             `
@@ -716,21 +1167,98 @@ function createPlanet(data, index) {
     
     // Add special features
     if (data.rings) {
-        // Saturn's rings
-        const ringGeometry = new THREE.RingGeometry(
-            data.ringInnerRadius,
-            data.ringOuterRadius,
-            64
-        );
-        const ringMaterial = new THREE.MeshBasicMaterial({
-            color: 0xE8D4A2,
-            side: THREE.DoubleSide,
-            transparent: true,
-            opacity: 0.7
+        // Saturn's rings - create multiple ring layers for realism
+        const ringGroup = new THREE.Group();
+        
+        // Ring data (inner radius, outer radius, color, opacity)
+        const ringData = [
+            { inner: 35, outer: 40, color: 0xBDB76B, opacity: 0.8 },
+            { inner: 41, outer: 48, color: 0xD4A76A, opacity: 0.7 },
+            { inner: 49, outer: 54, color: 0xE8D4A2, opacity: 0.6 },
+            { inner: 55, outer: 58, color: 0xC4915C, opacity: 0.5 },
+            { inner: 59, outer: 65, color: 0xFAD5A5, opacity: 0.4 }
+        ];
+        
+        ringData.forEach((ring, index) => {
+            const ringGeometry = new THREE.RingGeometry(
+                ring.inner,
+                ring.outer,
+                128,
+                1,
+                0,
+                Math.PI * 2
+            );
+            
+            // Add UV coordinates for texture mapping
+            const uvs = ringGeometry.attributes.uv.array;
+            for (let i = 0; i < uvs.length; i += 2) {
+                // Radial UV mapping
+                const angle = uvs[i] * Math.PI * 2;
+                uvs[i] = Math.cos(angle) * 0.5 + 0.5;
+                uvs[i + 1] = Math.sin(angle) * 0.5 + 0.5;
+            }
+            
+            // Create ring material with procedural texture
+            const ringMaterial = new THREE.ShaderMaterial({
+                uniforms: {
+                    time: { value: 0 },
+                    baseColor: { value: new THREE.Color(ring.color) },
+                    innerRadius: { value: ring.inner },
+                    outerRadius: { value: ring.outer }
+                },
+                vertexShader: `
+                    varying vec2 vUv;
+                    varying float vRadius;
+                    void main() {
+                        vUv = uv;
+                        vRadius = length(position.xy);
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                    }
+                `,
+                fragmentShader: `
+                    uniform float time;
+                    uniform vec3 baseColor;
+                    uniform float innerRadius;
+                    uniform float outerRadius;
+                    varying vec2 vUv;
+                    varying float vRadius;
+                    
+                    float random(vec2 st) {
+                        return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453);
+                    }
+                    
+                    void main() {
+                        // Create concentric ring pattern
+                        float ringPattern = sin(vRadius * 200.0) * 0.5 + 0.5;
+                        
+                        // Add radial variation
+                        float angle = atan(vUv.y - 0.5, vUv.x - 0.5);
+                        float radialNoise = random(vec2(angle * 10.0, vRadius)) * 0.3;
+                        
+                        // Fade edges
+                        float edgeFade = smoothstep(innerRadius, innerRadius + 2.0, vRadius) * 
+                                        smoothstep(outerRadius, outerRadius - 2.0, vRadius);
+                        
+                        // Combine patterns
+                        vec3 color = baseColor * (0.7 + ringPattern * 0.3 + radialNoise);
+                        float alpha = ` + ring.opacity + ` * edgeFade * (0.8 + ringPattern * 0.2);
+                        
+                        gl_FragColor = vec4(color, alpha);
+                    }
+                `,
+                side: THREE.DoubleSide,
+                transparent: true,
+                depthWrite: false,
+                blending: THREE.NormalBlending
+            });
+            
+            const ringMesh = new THREE.Mesh(ringGeometry, ringMaterial);
+            ringMesh.rotation.x = Math.PI / 2 + (Math.random() - 0.5) * 0.02; // Slight tilt variation
+            ringGroup.add(ringMesh);
         });
-        planetObject.rings = new THREE.Mesh(ringGeometry, ringMaterial);
-        planetObject.rings.rotation.x = Math.PI / 2;
-        scene.add(planetObject.rings);
+        
+        planetObject.rings = ringGroup;
+        scene.add(ringGroup);
     }
     
     if (data.clouds) {
@@ -771,6 +1299,11 @@ function updatePlanetPosition(planet) {
     
     if (planet.rings) {
         planet.rings.position.copy(planet.mesh.position);
+        // Add slight tilt to Saturn's rings
+        if (planet.data.name === "Saturn") {
+            planet.rings.rotation.x = Math.PI / 2 - 0.45; // 26.7 degree tilt
+            planet.rings.rotation.y = planet.angle * 0.1; // Slight rotation with orbit
+        }
     }
     
     if (planet.clouds) {
@@ -883,6 +1416,60 @@ function animate() {
         orbit.position.copy(sunPosition);
     });
     
+    // Animate solar flares
+    solarFlares.forEach((flareSystem, systemIndex) => {
+        const positions = flareSystem.geometry.attributes.position.array;
+        const sizes = flareSystem.geometry.attributes.size.array;
+        const velocities = flareSystem.userData.velocities;
+        const lifetimes = flareSystem.userData.lifetimes;
+        
+        for (let i = 0; i < positions.length / 3; i++) {
+            const i3 = i * 3;
+            
+            // Update lifetime
+            lifetimes[i] -= deltaTime;
+            
+            if (lifetimes[i] <= 0) {
+                // Reset particle
+                resetFlareParticle(positions, velocities, sizes, lifetimes, i);
+                // Offset to sun position
+                positions[i3] += sunPosition.x;
+                positions[i3 + 1] += sunPosition.y;
+                positions[i3 + 2] += sunPosition.z;
+            } else {
+                // Update position
+                positions[i3] += velocities[i3] * deltaTime * 20;
+                positions[i3 + 1] += velocities[i3 + 1] * deltaTime * 20;
+                positions[i3 + 2] += velocities[i3 + 2] * deltaTime * 20;
+                
+                // Apply gravity back towards sun
+                const dx = sunPosition.x - positions[i3];
+                const dy = sunPosition.y - positions[i3 + 1];
+                const dz = sunPosition.z - positions[i3 + 2];
+                const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                
+                if (dist > 65) { // Only apply gravity outside sun radius
+                    const gravity = 0.5;
+                    velocities[i3] += (dx / dist) * gravity * deltaTime;
+                    velocities[i3 + 1] += (dy / dist) * gravity * deltaTime;
+                    velocities[i3 + 2] += (dz / dist) * gravity * deltaTime;
+                }
+                
+                // Fade out
+                sizes[i] = (lifetimes[i] / 3) * (Math.random() * 5 + 2);
+            }
+        }
+        
+        // Update buffers
+        flareSystem.geometry.attributes.position.needsUpdate = true;
+        flareSystem.geometry.attributes.size.needsUpdate = true;
+        
+        // Update shader uniforms
+        if (flareSystem.material.uniforms) {
+            flareSystem.material.uniforms.time.value = elapsedTime;
+        }
+    });
+    
     // Animate stars
     if (starField1) {
         starField1.rotation.y += 0.0001;
@@ -921,7 +1508,16 @@ function animate() {
         }
         
         if (planet.rings) {
-            planet.rings.rotation.z += 0.0005;
+            // Animate ring rotation
+            if (planet.data.name === "Saturn") {
+                // Update shader uniforms for each ring
+                planet.rings.children.forEach(ring => {
+                    if (ring.material && ring.material.uniforms) {
+                        ring.material.uniforms.time.value = elapsedTime;
+                    }
+                });
+            }
+            planet.rings.rotation.z += 0.0002;
         }
     });
     
