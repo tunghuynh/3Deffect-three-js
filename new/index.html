@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Interactive 3D Solar System with Multi-window Support">
+    <title>Solar System 3D - Interactive Space Experience</title>
+    
+    <style>
+        /* CSS Reset and Base Styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+        }
+        
+        body {
+            background: #000;
+            position: relative;
+        }
+        
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+        
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+        }
+        
+        /* Loading Screen */
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #fff;
+            font-size: 24px;
+            text-align: center;
+            z-index: 1000;
+        }
+        
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(255,255,255,0.1);
+            border-top: 3px solid #fff;
+            border-radius: 50%;
+            margin: 20px auto;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Info Panel */
+        #info-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #fff;
+            background: rgba(0,0,0,0.5);
+            padding: 15px;
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+            font-size: 14px;
+            max-width: 300px;
+            z-index: 100;
+        }
+        
+        #info-panel h3 {
+            margin-bottom: 10px;
+            color: #ffd700;
+        }
+        
+        #info-panel p {
+            margin-bottom: 5px;
+            opacity: 0.9;
+        }
+        
+        /* Planet Labels */
+        .planet-label {
+            position: absolute;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 600;
+            text-shadow: 0 0 10px rgba(0,0,0,0.8), 0 0 20px rgba(0,0,0,0.5);
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            white-space: nowrap;
+            z-index: 50;
+        }
+        
+        /* Controls hint */
+        #controls-hint {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255,255,255,0.7);
+            font-size: 12px;
+            text-align: center;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">
+        <div>Loading Solar System...</div>
+        <div class="loading-spinner"></div>
+    </div>
+    
+    <div id="canvas-container"></div>
+    
+    <div id="info-panel">
+        <h3>Solar System</h3>
+        <p id="window-count">Windows: 1</p>
+        <p id="planet-count">Celestial Bodies: 1 (Sun)</p>
+        <p id="fps">FPS: 60</p>
+    </div>
+    
+    <div id="controls-hint">
+        Click anywhere to move the Sun • Open more windows to reveal planets
+    </div>
+    
+    <!-- Three.js -->
+    <script src="../three.r124.min.js"></script>
+    
+    <!-- WindowManager -->
+    <script src="../WindowManager.js"></script>
+    
+    <!-- Main Solar System Script -->
+    <script src="solar-system.js"></script>
+</body>
+</html>

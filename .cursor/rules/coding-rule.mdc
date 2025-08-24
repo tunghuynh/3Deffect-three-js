@@ -39,7 +39,7 @@ alwaysApply: true
   ```
 
 ### 4. 💬 Quy tắc Git Commit Message
-- **Ngắn gọn** nhưng đủ ý nghĩa
+- **Ngắn gọn** nhưng đủ ý nghĩa, tối đa 100 ký tự, sử dụng message tiếng Anh
 - **Format khuyến nghị:**
   - `feat:` - Tính năng mới
   - `fix:` - Sửa lỗi
