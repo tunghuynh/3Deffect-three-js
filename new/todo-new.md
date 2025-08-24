@@ -155,12 +155,12 @@
 - [ ] Special features flags
 
 ### 3.3 Mercury Data và Properties
-- [ ] Accurate size ratio (0.38 Earth)
-- [ ] Orbital distance scaling
-- [ ] Surface color/texture data
-- [ ] Rotation period (59 days)
+- [x] Accurate size ratio (0.38 Earth)
+- [x] Orbital distance scaling
+- [x] Surface color/texture data
+- [x] Rotation period (59 days)
 - [ ] Temperature variations
-- [ ] Crater mapping data
+- [x] Crater mapping data
 
 ### 3.4 Venus Data và Properties
 - [ ] Size ratio (0.95 Earth)
@@ -171,36 +171,36 @@
 - [ ] Yellowish coloration
 
 ### 3.5 Earth Data và Properties
-- [ ] Exact size reference (1.0)
-- [ ] Blue marble texture coords
-- [ ] Cloud layer separate
-- [ ] Axial tilt (23.5°)
-- [ ] Moon orbital data
-- [ ] Day/night cycle data
+- [x] Exact size reference (1.0)
+- [x] Blue marble texture coords
+- [x] Cloud layer separate
+- [x] Axial tilt (23.5°)
+- [x] Moon orbital data
+- [x] Day/night cycle data
 
 ### 3.6 Mars Data và Properties
-- [ ] Size ratio (0.53 Earth)
-- [ ] Red coloration data
-- [ ] Polar ice caps
-- [ ] Two moons data
+- [x] Size ratio (0.53 Earth)
+- [x] Red coloration data
+- [x] Polar ice caps
+- [x] Two moons data
 - [ ] Dust storm effects
-- [ ] Surface features
+- [x] Surface features
 
 ### 3.7 Jupiter Data và Properties
-- [ ] Giant size (11.2 Earth)
-- [ ] Gas bands data
-- [ ] Great Red Spot position
-- [ ] Fast rotation (10 hours)
-- [ ] Major moons data (4)
+- [x] Giant size (11.2 Earth)
+- [x] Gas bands data
+- [x] Great Red Spot position
+- [x] Fast rotation (10 hours)
+- [x] Major moons data (4)
 - [ ] Atmospheric dynamics
 
 ### 3.8 Saturn Data và Properties
-- [ ] Size ratio (9.5 Earth)
-- [ ] Ring system data
-- [ ] Multiple ring layers
+- [x] Size ratio (9.5 Earth)
+- [x] Ring system data
+- [x] Multiple ring layers
 - [ ] Hexagonal pole
-- [ ] Major moons
-- [ ] Tilt angle
+- [x] Major moons
+- [x] Tilt angle
 
 ### 3.9 Uranus Data và Properties
 - [ ] Size ratio (4.0 Earth)

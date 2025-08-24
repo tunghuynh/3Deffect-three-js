@@ -51,7 +51,10 @@ const planetData = [
         rotationSpeed: 0.02,
         eccentricity: 0.017,
         clouds: true,
-        axialTilt: 23.5
+        axialTilt: 23.5,
+        moons: [
+            { name: "Moon", radius: 2.7, distance: 30, speed: 0.1 }
+        ]
     },
     { 
         name: "Mars", 
@@ -61,7 +64,11 @@ const planetData = [
         speed: 0.024,
         rotationSpeed: 0.018,
         eccentricity: 0.093,
-        polarCaps: true
+        polarCaps: true,
+        moons: [
+            { name: "Phobos", radius: 0.7, distance: 15, speed: 0.3 },
+            { name: "Deimos", radius: 0.4, distance: 20, speed: 0.15 }
+        ]
     },
     { 
         name: "Jupiter", 
@@ -72,7 +79,13 @@ const planetData = [
         rotationSpeed: 0.04,
         eccentricity: 0.048,
         bands: true,
-        redSpot: true
+        redSpot: true,
+        moons: [
+            { name: "Io", radius: 2.8, distance: 60, speed: 0.2 },
+            { name: "Europa", radius: 2.4, distance: 70, speed: 0.15 },
+            { name: "Ganymede", radius: 4.1, distance: 85, speed: 0.1 },
+            { name: "Callisto", radius: 3.8, distance: 100, speed: 0.08 }
+        ]
     },
     { 
         name: "Saturn", 
@@ -84,7 +97,13 @@ const planetData = [
         eccentricity: 0.056,
         rings: true,
         ringInnerRadius: 35,
-        ringOuterRadius: 65
+        ringOuterRadius: 65,
+        moons: [
+            { name: "Titan", radius: 4.0, distance: 80, speed: 0.12 },
+            { name: "Rhea", radius: 1.2, distance: 95, speed: 0.1 },
+            { name: "Iapetus", radius: 1.1, distance: 110, speed: 0.08 },
+            { name: "Dione", radius: 0.9, distance: 88, speed: 0.11 }
+        ]
     },
     { 
         name: "Uranus", 
@@ -665,6 +684,124 @@ function createSunTexture() {
     return texture;
 }
 
+// Create moon texture
+function createMoonTexture(moonName = 'default') {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    
+    switch(moonName) {
+        case 'Moon': // Earth's Moon
+            // Gray base with maria
+            const moonGrad = ctx.createRadialGradient(128, 64, 0, 128, 64, 100);
+            moonGrad.addColorStop(0, '#D3D3D3');
+            moonGrad.addColorStop(0.5, '#C0C0C0');
+            moonGrad.addColorStop(1, '#A9A9A9');
+            ctx.fillStyle = moonGrad;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Add maria (dark regions)
+            for(let i = 0; i < 5; i++) {
+                const x = Math.random() * canvas.width;
+                const y = Math.random() * canvas.height;
+                const r = Math.random() * 30 + 10;
+                const mariaGrad = ctx.createRadialGradient(x, y, 0, x, y, r);
+                mariaGrad.addColorStop(0, 'rgba(80,80,80,0.5)');
+                mariaGrad.addColorStop(1, 'rgba(100,100,100,0)');
+                ctx.fillStyle = mariaGrad;
+                ctx.fillRect(x - r, y - r, r * 2, r * 2);
+            }
+            
+            // Add craters
+            for(let i = 0; i < 15; i++) {
+                const x = Math.random() * canvas.width;
+                const y = Math.random() * canvas.height;
+                const r = Math.random() * 8 + 2;
+                ctx.beginPath();
+                ctx.arc(x, y, r, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(0,0,0,${Math.random() * 0.4 + 0.2})`;
+                ctx.fill();
+            }
+            break;
+            
+        case 'Phobos': // Mars moon
+        case 'Deimos': // Mars moon
+            // Irregular rocky surface
+            ctx.fillStyle = '#8B7355';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            for(let i = 0; i < 10; i++) {
+                ctx.beginPath();
+                ctx.arc(Math.random() * canvas.width, Math.random() * canvas.height, 
+                    Math.random() * 5 + 1, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(0,0,0,0.4)';
+                ctx.fill();
+            }
+            break;
+            
+        case 'Io': // Jupiter moon - volcanic
+            // Yellow-orange base
+            ctx.fillStyle = '#FFD700';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            // Volcanic spots
+            for(let i = 0; i < 10; i++) {
+                const x = Math.random() * canvas.width;
+                const y = Math.random() * canvas.height;
+                const r = Math.random() * 15 + 5;
+                const volcanoGrad = ctx.createRadialGradient(x, y, 0, x, y, r);
+                volcanoGrad.addColorStop(0, '#FF4500');
+                volcanoGrad.addColorStop(0.5, '#FF6347');
+                volcanoGrad.addColorStop(1, '#FFD700');
+                ctx.fillStyle = volcanoGrad;
+                ctx.beginPath();
+                ctx.arc(x, y, r, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            break;
+            
+        case 'Europa': // Jupiter moon - icy
+            // Ice blue base
+            ctx.fillStyle = '#E0FFFF';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            // Linear ice cracks
+            ctx.strokeStyle = '#4682B4';
+            ctx.lineWidth = 1;
+            for(let i = 0; i < 20; i++) {
+                ctx.beginPath();
+                ctx.moveTo(Math.random() * canvas.width, Math.random() * canvas.height);
+                ctx.lineTo(Math.random() * canvas.width, Math.random() * canvas.height);
+                ctx.stroke();
+            }
+            break;
+            
+        case 'Titan': // Saturn moon - atmosphere
+            // Orange hazy atmosphere
+            const titanGrad = ctx.createRadialGradient(128, 64, 0, 128, 64, 100);
+            titanGrad.addColorStop(0, '#FF8C00');
+            titanGrad.addColorStop(0.5, '#FFA500');
+            titanGrad.addColorStop(1, '#FF7F50');
+            ctx.fillStyle = titanGrad;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            break;
+            
+        default:
+            // Generic gray moon
+            ctx.fillStyle = '#C0C0C0';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            for(let i = 0; i < 20; i++) {
+                ctx.beginPath();
+                ctx.arc(Math.random() * canvas.width, Math.random() * canvas.height, 
+                    Math.random() * 8 + 2, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(0,0,0,${Math.random() * 0.4 + 0.1})`;
+                ctx.fill();
+            }
+    }
+    
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+    return texture;
+}
+
 // Create the Sun
 function createSun() {
     // Sun core
@@ -924,6 +1061,14 @@ function updatePlanets(windowCount) {
         if (planet.rings) scene.remove(planet.rings);
         if (planet.clouds) scene.remove(planet.clouds);
         if (planet.label) document.body.removeChild(planet.label);
+        
+        // Remove moons
+        if (planet.moons) {
+            planet.moons.forEach(moon => {
+                scene.remove(moon.group);
+                if (moon.label) document.body.removeChild(moon.label);
+            });
+        }
     });
     planets = [];
     
@@ -1169,6 +1314,46 @@ function createPlanet(data, index) {
         scene.add(planetObject.clouds);
     }
     
+    // Add moons if planet has them
+    if (data.moons && data.moons.length > 0) {
+        planetObject.moons = [];
+        data.moons.forEach((moonData, moonIndex) => {
+            const moonGroup = new THREE.Group();
+            
+            // Create moon sphere
+            const moonGeometry = new THREE.SphereGeometry(moonData.radius, 16, 16);
+            const moonTexture = createMoonTexture(moonData.name);
+            const moonMaterial = new THREE.MeshPhongMaterial({
+                map: moonTexture,
+                shininess: 5,
+                emissive: 0x111111,
+                emissiveIntensity: 0.05
+            });
+            const moon = new THREE.Mesh(moonGeometry, moonMaterial);
+            moonGroup.add(moon);
+            
+            // Create moon label
+            const moonLabel = document.createElement('div');
+            moonLabel.className = 'planet-label';
+            moonLabel.textContent = moonData.name;
+            moonLabel.style.fontSize = '10px';
+            moonLabel.style.color = '#cccccc';
+            document.body.appendChild(moonLabel);
+            
+            // Store moon data
+            const moonObject = {
+                mesh: moon,
+                group: moonGroup,
+                data: moonData,
+                label: moonLabel,
+                angle: Math.random() * Math.PI * 2
+            };
+            
+            planetObject.moons.push(moonObject);
+            scene.add(moonGroup);
+        });
+    }
+    
     // Create label
     const label = document.createElement('div');
     label.className = 'planet-label';
@@ -1204,6 +1389,13 @@ function updatePlanetPosition(planet) {
     if (planet.clouds) {
         planet.clouds.position.copy(planet.mesh.position);
     }
+    
+    // Update moon positions
+    if (planet.moons) {
+        planet.moons.forEach((moon) => {
+            moon.group.position.copy(planet.mesh.position);
+        });
+    }
 }
 
 // Update label positions
@@ -1220,6 +1412,25 @@ function updateLabels() {
             planet.label.style.left = x + 'px';
             planet.label.style.top = y + 'px';
             planet.label.style.display = vector.z < 1 ? 'block' : 'none';
+        }
+        
+        // Update moon labels
+        if (planet.moons) {
+            planet.moons.forEach(moon => {
+                if (moon.label) {
+                    const moonWorldPos = new THREE.Vector3();
+                    moon.mesh.getWorldPosition(moonWorldPos);
+                    moonWorldPos.y += moon.data.radius + 5;
+                    moonWorldPos.project(camera);
+                    
+                    const x = (moonWorldPos.x * 0.5 + 0.5) * window.innerWidth;
+                    const y = (-moonWorldPos.y * 0.5 + 0.5) * window.innerHeight;
+                    
+                    moon.label.style.left = x + 'px';
+                    moon.label.style.top = y + 'px';
+                    moon.label.style.display = moonWorldPos.z < 1 ? 'block' : 'none';
+                }
+            });
         }
     });
 }
@@ -1419,6 +1630,23 @@ function animate() {
         if (planet.rings) {
             // Animate ring rotation
             planet.rings.rotation.z += 0.0002;
+        }
+        
+        // Animate moons
+        if (planet.moons) {
+            planet.moons.forEach(moon => {
+                // Update moon orbital angle
+                moon.angle += moon.data.speed * deltaTime;
+                
+                // Calculate moon position relative to planet
+                const moonX = moon.data.distance * Math.cos(moon.angle);
+                const moonZ = moon.data.distance * Math.sin(moon.angle);
+                
+                moon.mesh.position.set(moonX, 0, moonZ);
+                
+                // Rotate moon on its axis
+                moon.mesh.rotation.y += 0.01;
+            });
         }
     });
     
