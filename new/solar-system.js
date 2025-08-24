@@ -109,10 +109,20 @@ const planetData = [
     }
 ];
 
+// Performance monitoring
+const performanceMonitor = {
+    drawCalls: 0,
+    triangles: 0,
+    textures: 0,
+    geometries: 0,
+    windowCount: 1
+};
+
 // Initialize the scene
 function init() {
     // Setup scene
     scene = new THREE.Scene();
+    scene.fog = new THREE.Fog(0x000000, 1000, 5000); // Add fog for depth
     
     // Setup camera
     camera = new THREE.PerspectiveCamera(
@@ -124,14 +134,15 @@ function init() {
     camera.position.set(0, 300, 600);
     camera.lookAt(0, 0, 0);
     
-    // Setup renderer
+    // Setup renderer with performance optimizations
     renderer = new THREE.WebGLRenderer({ 
-        antialias: true,
-        alpha: false 
+        antialias: window.devicePixelRatio < 2, // Disable AA on high DPI displays
+        alpha: false,
+        powerPreference: "high-performance"
     });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.shadowMap.enabled = true;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Cap at 2x for performance
+    renderer.shadowMap.enabled = false; // Disable shadows for better performance
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     
     // Add renderer to DOM
@@ -722,8 +733,49 @@ function onWindowCountChange(count) {
     // Update UI
     document.getElementById('window-count').textContent = `Windows: ${count}`;
     
+    // Update performance settings based on window count
+    performanceMonitor.windowCount = count;
+    adjustPerformanceSettings(count);
+    
     // Update planets based on window count
     updatePlanets(count);
+}
+
+// Adjust performance settings based on window count
+function adjustPerformanceSettings(windowCount) {
+    // Reduce particle count for multiple windows
+    if (windowCount > 4) {
+        // Reduce star field density
+        if (starField1) {
+            starField1.visible = windowCount <= 6;
+        }
+        if (starField2) {
+            starField2.visible = windowCount <= 8;
+        }
+        
+        // Reduce nebula effects
+        nebulaPlanes.forEach((nebula, index) => {
+            nebula.visible = index === 0 || windowCount <= 5;
+        });
+        
+        // Reduce solar flare particles
+        solarFlares.forEach(flare => {
+            flare.visible = windowCount <= 7;
+        });
+    } else {
+        // Restore all effects for fewer windows
+        if (starField1) starField1.visible = true;
+        if (starField2) starField2.visible = true;
+        nebulaPlanes.forEach(nebula => nebula.visible = true);
+        solarFlares.forEach(flare => flare.visible = true);
+    }
+    
+    // Adjust renderer pixel ratio
+    if (windowCount > 6) {
+        renderer.setPixelRatio(1); // Force 1x for many windows
+    } else {
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    }
 }
 
 // Update planets based on window count
@@ -762,8 +814,15 @@ function createPlanet(data, index) {
         label: null
     };
     
-    // Create planet sphere
-    const geometry = new THREE.SphereGeometry(data.radius, 64, 64);
+    // Create planet sphere with LOD
+    const lod = new THREE.LOD();
+    
+    // High detail (close)
+    const geometryHigh = new THREE.SphereGeometry(data.radius, 64, 64);
+    // Medium detail
+    const geometryMed = new THREE.SphereGeometry(data.radius, 32, 32);
+    // Low detail (far)
+    const geometryLow = new THREE.SphereGeometry(data.radius, 16, 16);
     
     // Create material based on planet properties
     let material;
@@ -1163,7 +1222,17 @@ function createPlanet(data, index) {
         });
     }
     
-    planetObject.mesh = new THREE.Mesh(geometry, material);
+    // Create LOD meshes
+    const meshHigh = new THREE.Mesh(geometryHigh, material);
+    const meshMed = new THREE.Mesh(geometryMed, material);
+    const meshLow = new THREE.Mesh(geometryLow, material);
+    
+    // Add LOD levels (distance from camera)
+    lod.addLevel(meshHigh, 0);
+    lod.addLevel(meshMed, data.radius * 20);
+    lod.addLevel(meshLow, data.radius * 50);
+    
+    planetObject.mesh = lod;
     
     // Add special features
     if (data.rings) {
