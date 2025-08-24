@@ -1219,6 +1219,112 @@ function createPlanet(data, index) {
     
     planetObject.mesh = lod;
     
+    // Add special planetary features
+    if (data.name === "Jupiter") {
+        // Add Great Red Spot as a separate feature
+        const spotRadius = data.radius * 0.15;
+        const spotGeometry = new THREE.SphereGeometry(data.radius * 1.001, 32, 16, 
+            Math.PI * 0.2, Math.PI * 0.3, // Limit to a section
+            Math.PI * 0.4, Math.PI * 0.2  // Limit vertically
+        );
+        const spotMaterial = new THREE.MeshPhongMaterial({
+            color: 0xCD5C5C,
+            emissive: 0x8B3626,
+            emissiveIntensity: 0.2,
+            transparent: true,
+            opacity: 0.7,
+            side: THREE.DoubleSide
+        });
+        const redSpot = new THREE.Mesh(spotGeometry, spotMaterial);
+        redSpot.rotation.y = Math.PI * 0.3; // Position on Jupiter
+        lod.getObjectForDistance(0).add(redSpot); // Add to high detail mesh
+        planetObject.redSpot = redSpot;
+    }
+    
+    if (data.name === "Saturn") {
+        // Add hexagonal storm at north pole
+        const hexRadius = data.radius * 0.2;
+        const hexShape = new THREE.Shape();
+        for (let i = 0; i < 6; i++) {
+            const angle = (i / 6) * Math.PI * 2;
+            const x = Math.cos(angle) * hexRadius;
+            const y = Math.sin(angle) * hexRadius;
+            if (i === 0) hexShape.moveTo(x, y);
+            else hexShape.lineTo(x, y);
+        }
+        hexShape.closePath();
+        
+        const hexGeometry = new THREE.ShapeGeometry(hexShape);
+        const hexMaterial = new THREE.MeshPhongMaterial({
+            color: 0xE8C88C,
+            emissive: 0xC4915C,
+            emissiveIntensity: 0.1,
+            transparent: true,
+            opacity: 0.5,
+            side: THREE.DoubleSide
+        });
+        const hexStorm = new THREE.Mesh(hexGeometry, hexMaterial);
+        hexStorm.position.y = data.radius * 0.95; // Position at north pole
+        hexStorm.rotation.x = -Math.PI / 2; // Face upward
+        lod.getObjectForDistance(0).add(hexStorm);
+        planetObject.hexStorm = hexStorm;
+    }
+    
+    if (data.name === "Earth" || data.name === "Mars") {
+        // Add polar ice caps
+        const iceCaps = new THREE.Group();
+        
+        // North pole ice cap
+        const northCapGeometry = new THREE.SphereGeometry(
+            data.radius * 1.001, 32, 16,
+            0, Math.PI * 2,
+            0, Math.PI * 0.15  // Top section
+        );
+        const iceCapMaterial = new THREE.MeshPhongMaterial({
+            color: data.name === "Earth" ? 0xFFFFFF : 0xF0E6DC,
+            emissive: 0xEEEEEE,
+            emissiveIntensity: 0.05,
+            shininess: 80,
+            transparent: true,
+            opacity: data.name === "Earth" ? 0.9 : 0.8,
+            side: THREE.DoubleSide
+        });
+        const northCap = new THREE.Mesh(northCapGeometry, iceCapMaterial);
+        iceCaps.add(northCap);
+        
+        // South pole ice cap
+        const southCapGeometry = new THREE.SphereGeometry(
+            data.radius * 1.001, 32, 16,
+            0, Math.PI * 2,
+            Math.PI * 0.85, Math.PI * 0.15  // Bottom section
+        );
+        const southCap = new THREE.Mesh(southCapGeometry, iceCapMaterial);
+        iceCaps.add(southCap);
+        
+        lod.getObjectForDistance(0).add(iceCaps);
+        planetObject.iceCaps = iceCaps;
+    }
+    
+    if (data.name === "Neptune") {
+        // Add Great Dark Spot
+        const darkSpotGeometry = new THREE.SphereGeometry(data.radius * 1.001, 16, 16,
+            Math.PI * 0.5, Math.PI * 0.2, // Horizontal section
+            Math.PI * 0.45, Math.PI * 0.1  // Vertical section
+        );
+        const darkSpotMaterial = new THREE.MeshPhongMaterial({
+            color: 0x1E3A8A,
+            emissive: 0x000033,
+            emissiveIntensity: 0.1,
+            transparent: true,
+            opacity: 0.6,
+            side: THREE.DoubleSide
+        });
+        const darkSpot = new THREE.Mesh(darkSpotGeometry, darkSpotMaterial);
+        darkSpot.rotation.y = Math.PI * 0.6;
+        lod.getObjectForDistance(0).add(darkSpot);
+        planetObject.darkSpot = darkSpot;
+    }
+    
     // Add special features
     if (data.rings) {
         // Saturn's rings - create multiple ring layers for realism
@@ -1618,9 +1724,22 @@ function animate() {
         // Rotation
         planet.mesh.rotation.y += planet.data.rotationSpeed;
         
-        // Special animations for Jupiter (Great Red Spot)
-        if (planet.data.name === "Jupiter") {
-            // Rotation is already handled above
+        // Special animations for planetary features
+        if (planet.data.name === "Jupiter" && planet.redSpot) {
+            // Animate Great Red Spot
+            planet.redSpot.rotation.y += 0.001; // Slow drift
+            const spotScale = 1 + Math.sin(elapsedTime * 0.5) * 0.1;
+            planet.redSpot.scale.set(spotScale, 1, spotScale);
+        }
+        
+        if (planet.data.name === "Saturn" && planet.hexStorm) {
+            // Rotate hexagonal storm
+            planet.hexStorm.rotation.z += 0.0005;
+        }
+        
+        if (planet.data.name === "Neptune" && planet.darkSpot) {
+            // Drift dark spot
+            planet.darkSpot.rotation.y += 0.0008;
         }
         
         if (planet.clouds) {
