@@ -177,6 +177,9 @@ function init() {
     // Create nebula effects
     createNebulaEffects();
     
+    // Create Milky Way band
+    createMilkyWay();
+    
     // Create the Sun
     createSun();
     
@@ -467,6 +470,158 @@ function createNebulaEffects() {
         nebulaPlanes.push(nebulaMesh);
         scene.add(nebulaMesh);
     });
+}
+
+// Create Milky Way band
+function createMilkyWay() {
+    // Create curved band geometry
+    const curve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(-2000, 300, -1500),
+        new THREE.Vector3(-1000, 200, -1600),
+        new THREE.Vector3(0, 100, -1700),
+        new THREE.Vector3(1000, 150, -1600),
+        new THREE.Vector3(2000, 250, -1500)
+    ]);
+    
+    // Create tube geometry following the curve
+    const tubeGeometry = new THREE.TubeGeometry(curve, 100, 300, 8, false);
+    
+    // Create shader material for Milky Way
+    const milkyWayMaterial = new THREE.ShaderMaterial({
+        uniforms: {
+            time: { value: 0 },
+            baseColor: { value: new THREE.Color(0x8B7355) },
+            glowColor: { value: new THREE.Color(0xFFF8DC) },
+            starDensity: { value: 2.0 }
+        },
+        vertexShader: `
+            varying vec2 vUv;
+            varying vec3 vPosition;
+            void main() {
+                vUv = uv;
+                vPosition = position;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+        `,
+        fragmentShader: `
+            uniform float time;
+            uniform vec3 baseColor;
+            uniform vec3 glowColor;
+            uniform float starDensity;
+            varying vec2 vUv;
+            varying vec3 vPosition;
+            
+            float random(vec2 st) {
+                return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453);
+            }
+            
+            float noise(vec2 st) {
+                vec2 i = floor(st);
+                vec2 f = fract(st);
+                float a = random(i);
+                float b = random(i + vec2(1.0, 0.0));
+                float c = random(i + vec2(0.0, 1.0));
+                float d = random(i + vec2(1.0, 1.0));
+                vec2 u = f * f * (3.0 - 2.0 * f);
+                return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
+            }
+            
+            void main() {
+                vec2 st = vUv * vec2(20.0, 5.0);
+                
+                // Create star clusters
+                float stars = 0.0;
+                for(int i = 0; i < 3; i++) {
+                    float n = noise(st * (1.0 + float(i) * 0.5) + time * 0.01);
+                    stars += pow(n, 3.0 + float(i)) * (1.0 / float(i + 1));
+                }
+                stars *= starDensity;
+                
+                // Create dust clouds
+                float dust = noise(st * 0.5 + time * 0.005) * 0.5 + 0.5;
+                dust *= noise(st * 1.5 - time * 0.002) * 0.5 + 0.5;
+                
+                // Mix colors
+                vec3 color = mix(baseColor, glowColor, stars);
+                color = mix(color * 0.2, color, dust);
+                
+                // Edge fade
+                float edgeFade = 1.0 - abs(vUv.y - 0.5) * 2.0;
+                edgeFade = smoothstep(0.0, 0.3, edgeFade);
+                
+                // Distance fade
+                float distFade = 1.0 - smoothstep(1500.0, 2500.0, length(vPosition));
+                
+                float alpha = (dust * 0.3 + stars * 0.7) * edgeFade * distFade * 0.6;
+                
+                gl_FragColor = vec4(color, alpha);
+            }
+        `,
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide
+    });
+    
+    const milkyWay = new THREE.Mesh(tubeGeometry, milkyWayMaterial);
+    milkyWay.name = 'milkyWay';
+    scene.add(milkyWay);
+    
+    // Add additional star cluster planes for depth
+    for (let i = 0; i < 3; i++) {
+        const planeGeometry = new THREE.PlaneGeometry(3000, 600);
+        const planeMaterial = new THREE.ShaderMaterial({
+            uniforms: {
+                time: { value: 0 },
+                opacity: { value: 0.2 - i * 0.05 }
+            },
+            vertexShader: `
+                varying vec2 vUv;
+                void main() {
+                    vUv = uv;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform float time;
+                uniform float opacity;
+                varying vec2 vUv;
+                
+                float random(vec2 st) {
+                    return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453);
+                }
+                
+                void main() {
+                    vec2 st = vUv * vec2(50.0, 10.0);
+                    float stars = 0.0;
+                    
+                    // Create point stars
+                    vec2 pos = floor(st);
+                    float r = random(pos);
+                    if(r > 0.98) {
+                        float dist = length(fract(st) - 0.5);
+                        stars = 1.0 - smoothstep(0.0, 0.05, dist);
+                    }
+                    
+                    gl_FragColor = vec4(1.0, 0.95, 0.9, stars * opacity);
+                }
+            `,
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+        });
+        
+        const plane = new THREE.Mesh(planeGeometry, planeMaterial);
+        plane.position.set(
+            (Math.random() - 0.5) * 500,
+            100 + i * 50,
+            -1700 - i * 100
+        );
+        plane.rotation.x = -0.2 + Math.random() * 0.4;
+        plane.rotation.y = -0.5 + Math.random() * 1.0;
+        plane.userData = { isMilkyWayPlane: true };
+        scene.add(plane);
+    }
 }
 
 // Create the Sun
@@ -1555,6 +1710,20 @@ function animate() {
             nebula.material.uniforms.time.value = elapsedTime;
             nebula.position.x += Math.sin(elapsedTime * 0.1 + index) * 0.1;
             nebula.position.y += Math.cos(elapsedTime * 0.1 + index) * 0.1;
+        }
+    });
+    
+    // Animate Milky Way
+    const milkyWay = scene.getObjectByName('milkyWay');
+    if (milkyWay && milkyWay.material.uniforms) {
+        milkyWay.material.uniforms.time.value = elapsedTime;
+        milkyWay.rotation.z += 0.00005; // Very slow rotation
+    }
+    
+    // Animate Milky Way planes
+    scene.traverse((child) => {
+        if (child.userData.isMilkyWayPlane && child.material.uniforms) {
+            child.material.uniforms.time.value = elapsedTime;
         }
     });
     

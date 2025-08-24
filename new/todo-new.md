@@ -65,12 +65,12 @@
 - [x] Blend modes cho ethereal look
 
 ### 1.9 Milky Way Band
-- [ ] Design curved milky way texture
-- [ ] Position across background
-- [ ] Add density variations
-- [ ] Implement subtle animation
-- [ ] Color grading cho realism
-- [ ] Depth layering effect
+- [x] Design curved milky way texture
+- [x] Position across background
+- [x] Add density variations
+- [x] Implement subtle animation
+- [x] Color grading cho realism
+- [x] Depth layering effect
 
 ## ☀️ Phase 2: Mặt Trời - Trung tâm Hệ thống
 
