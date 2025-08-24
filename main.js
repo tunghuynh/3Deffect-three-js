@@ -131,31 +131,26 @@ else
 
 	function setupScene ()
 	{
-		// Use PerspectiveCamera for 3D view
-		camera = new t.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 5000);
+		camera = new t.OrthographicCamera(0, 0, window.innerWidth, window.innerHeight, -10000, 10000);
 		
-		// Position camera to view from above at an angle
-		camera.position.set(0, 800, 1200);
-		camera.lookAt(0, 0, 0);
-		
-		near = 0.1;
-		far = 5000;
+		camera.position.z = 2.5;
+		near = camera.position.z - .5;
+		far = camera.position.z + 0.5;
 
 		scene = new t.Scene();
 		
 		// Add lighting for 3D effect
-		const ambientLight = new t.AmbientLight(0x404040, 0.3); // Dim ambient light for space
+		const ambientLight = new t.AmbientLight(0xffffff, 0.65); // Medium ambient light
 		scene.add(ambientLight);
 		
-		// Main light from sun - will be a point light at origin
-		const sunLight = new t.PointLight(0xffffff, 2, 2000);
-		sunLight.position.set(0, 0, 0);
-		scene.add(sunLight);
+		const directionalLight = new t.DirectionalLight(0xffffff, 1.25);
+		directionalLight.position.set(100, 100, 50);
+		scene.add(directionalLight);
 		
-		// Add a subtle fill light to see dark sides slightly
-		const fillLight = new t.DirectionalLight(0x4040ff, 0.1);
-		fillLight.position.set(0, 100, 0);
-		scene.add(fillLight);
+		// Add another directional light from opposite side for better illumination
+		const directionalLight2 = new t.DirectionalLight(0xffffff, 0.6);
+		directionalLight2.position.set(-100, -100, -50);
+		scene.add(directionalLight2);
 		
 		// Create gradient background for galaxy effect
 		const canvas = document.createElement('canvas');
@@ -218,51 +213,27 @@ else
 			}
 		});
 
-		// Click to rotate camera view
-		let mouseDown = false;
-		let mouseX = 0;
-		let mouseY = 0;
-		
-		renderer.domElement.addEventListener('mousedown', (e) => {
-			mouseDown = true;
-			mouseX = e.clientX;
-			mouseY = e.clientY;
+		// Click to move solar system center
+		renderer.domElement.addEventListener('click', (e) => {
+			if (!sun) return;
+			
+			// Get click position in screen coordinates (absolute position)
+			const clickX = e.clientX + window.screenX;
+			const clickY = e.clientY + window.screenY;
+			
+			// Update absolute position
+			sunAbsolutePosition = {
+				x: clickX,
+				y: clickY
+			};
+			
+			// Save to localStorage to sync with other windows
+			localStorage.setItem('sunAbsolutePosition', JSON.stringify(sunAbsolutePosition));
 		});
-		
-		renderer.domElement.addEventListener('mouseup', () => {
-			mouseDown = false;
-		});
-		
+
+		// Change cursor to pointer on hover
 		renderer.domElement.addEventListener('mousemove', (e) => {
-			renderer.domElement.style.cursor = mouseDown ? 'grabbing' : 'grab';
-			
-			if (!mouseDown) return;
-			
-			const deltaX = e.clientX - mouseX;
-			const deltaY = e.clientY - mouseY;
-			
-			// Rotate camera around origin
-			const spherical = new t.Spherical();
-			spherical.setFromVector3(camera.position);
-			spherical.theta -= deltaX * 0.01;
-			spherical.phi += deltaY * 0.01;
-			spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi));
-			camera.position.setFromSpherical(spherical);
-			camera.lookAt(0, 0, 0);
-			
-			mouseX = e.clientX;
-			mouseY = e.clientY;
-		});
-		
-		// Mouse wheel zoom
-		renderer.domElement.addEventListener('wheel', (e) => {
-			e.preventDefault();
-			const spherical = new t.Spherical();
-			spherical.setFromVector3(camera.position);
-			spherical.radius *= 1 + e.deltaY * 0.001;
-			spherical.radius = Math.max(300, Math.min(3000, spherical.radius));
-			camera.position.setFromSpherical(spherical);
-			camera.lookAt(0, 0, 0);
+			renderer.domElement.style.cursor = 'pointer';
 		});
 	}
 
@@ -299,7 +270,6 @@ else
 			orbitalPeriod: 0.24, // Earth years
 			rotationPeriod: 58.6, // Earth days
 			axialTilt: 0.03,
-			orbitalInclination: 7.0, // degrees to ecliptic
 			hasRings: false
 		},
 		{
@@ -312,7 +282,6 @@ else
 			orbitalPeriod: 0.62,
 			rotationPeriod: -243, // Negative = retrograde rotation
 			axialTilt: 177.4,
-			orbitalInclination: 3.4, // degrees to ecliptic
 			hasRings: false
 		},
 		{
@@ -325,7 +294,6 @@ else
 			orbitalPeriod: 1.0,
 			rotationPeriod: 1.0,
 			axialTilt: 23.5,
-			orbitalInclination: 0.0, // Reference plane
 			hasRings: false,
 			hasMoon: true
 		},
@@ -339,7 +307,6 @@ else
 			orbitalPeriod: 1.88,
 			rotationPeriod: 1.03,
 			axialTilt: 25.2,
-			orbitalInclination: 1.85, // degrees to ecliptic
 			hasRings: false
 		},
 		{
@@ -352,7 +319,6 @@ else
 			orbitalPeriod: 11.86,
 			rotationPeriod: 0.41,
 			axialTilt: 3.1,
-			orbitalInclination: 1.3, // degrees to ecliptic
 			hasRings: false,
 			hasGreatRedSpot: true
 		},
@@ -366,7 +332,6 @@ else
 			orbitalPeriod: 29.46,
 			rotationPeriod: 0.44,
 			axialTilt: 26.7,
-			orbitalInclination: 2.5, // degrees to ecliptic
 			hasRings: true,
 			ringInnerRadius: 55,  // Tăng kích thước vành đai
 			ringOuterRadius: 90,  // Tăng kích thước vành đai
@@ -382,7 +347,6 @@ else
 			orbitalPeriod: 84.01,
 			rotationPeriod: -0.72, // Negative = retrograde
 			axialTilt: 82.2,
-			orbitalInclination: 0.77, // degrees to ecliptic
 			hasRings: true,
 			ringInnerRadius: 38,  // Nhỏ hơn Saturn nhiều
 			ringOuterRadius: 48,  // Nhỏ hơn Saturn nhiều
@@ -398,7 +362,6 @@ else
 			orbitalPeriod: 164.79,
 			rotationPeriod: 0.67,
 			axialTilt: 28.3,
-			orbitalInclination: 1.77, // degrees to ecliptic
 			hasRings: false
 		}
 	];
@@ -408,29 +371,19 @@ else
 		name: planet.name,
 		semiMajorAxis: planet.semiMajorAxis,
 		eccentricity: planet.eccentricity,
-		color: planet.color,
-		inclination: planet.orbitalInclination || 0
+		color: planet.color
 	}));
 
-	function createOrbitLine(semiMajorAxis, eccentricity, color, inclination = 0) {
+	function createOrbitLine(semiMajorAxis, eccentricity, color) {
 		const points = [];
 		const segments = 128;
 		const semiMinorAxis = semiMajorAxis * Math.sqrt(1 - eccentricity * eccentricity);
 		
-		// Convert inclination to radians
-		const inclinationRad = (inclination * Math.PI) / 180;
-		
 		for (let i = 0; i <= segments; i++) {
 			const angle = (i / segments) * Math.PI * 2;
-			let x = semiMajorAxis * Math.cos(angle);
-			let y = 0;
-			let z = semiMinorAxis * Math.sin(angle);
-			
-			// Apply inclination rotation around X axis
-			const yNew = y * Math.cos(inclinationRad) - z * Math.sin(inclinationRad);
-			const zNew = y * Math.sin(inclinationRad) + z * Math.cos(inclinationRad);
-			
-			points.push(new t.Vector3(x, yNew, zNew));
+			const x = semiMajorAxis * Math.cos(angle);
+			const y = semiMinorAxis * Math.sin(angle);
+			points.push(new t.Vector3(x, y, 0));
 		}
 		
 		const geometry = new t.BufferGeometry().setFromPoints(points);
@@ -1130,10 +1083,12 @@ else
 			planetGroup.userData.moon = moon;
 		}
 		
-		// Store label reference but don't add to group - will be positioned in render
+		// Add label for planet name
 		const label = createLabel(planetInfo.name);
+		label.position.y = planetInfo.radius + 30; // Position above planet
+		label.position.z = 10; // Slightly forward to avoid clipping
+		planetGroup.add(label);
 		planetGroup.userData.label = label;
-		world.add(label); // Add directly to world
 		
 		return planetGroup;
 	}
@@ -1190,7 +1145,7 @@ else
 		
 		// Create new orbits
 		orbitData.forEach((data) => {
-			const orbit = createOrbitLine(data.semiMajorAxis, data.eccentricity, data.color, data.inclination);
+			const orbit = createOrbitLine(data.semiMajorAxis, data.eccentricity, data.color);
 			orbits.push(orbit);
 			world.add(orbit);
 		});
@@ -1333,10 +1288,6 @@ else
 		// Remove all planets
 		planets.forEach((planet) => {
 			world.remove(planet);
-			// Also remove planet label
-			if (planet.userData.label) {
-				world.remove(planet.userData.label);
-			}
 		});
 		planets = [];
 		
@@ -1351,14 +1302,33 @@ else
 			createSun();
 			createOrbits();
 			
-			// Position sun at origin in 3D space
-			sun.position.set(0, 0, 0);
-			sunGlow.position.set(0, 0, 0);
-			sunCorona.position.set(0, 0, 0);
+			// Position sun - if absolute position is set, use it
+			let sunX, sunY;
+			if (sunAbsolutePosition) {
+				// Use absolute position
+				sunX = sunAbsolutePosition.x;
+				sunY = sunAbsolutePosition.y;
+			} else {
+				// Default to center of first window
+				let firstWin = wins[0];
+				sunX = firstWin.shape.x + (firstWin.shape.w * .5);
+				sunY = firstWin.shape.y + (firstWin.shape.h * .5);
+			}
+			
+			sun.position.x = sunX;
+			sun.position.y = sunY;
+			sunGlow.position.x = sunX;
+			sunGlow.position.y = sunY;
+			sunCorona.position.x = sunX;
+			sunCorona.position.y = sunY;
 			// solarFlares.position.x = sunX; // Đã bỏ hiệu ứng flare
 			// solarFlares.position.y = sunY; // Đã bỏ hiệu ứng flare
 			
-			// Orbits are already centered at origin
+			// Position orbits at sun position
+			orbits.forEach((orbit) => {
+				orbit.position.x = sunX;
+				orbit.position.y = sunY;
+			});
 			
 			// Add planets based on number of windows (window 2 = Mercury, window 3 = Venus, etc.)
 			for (let i = 1; i < wins.length && i <= 8; i++) {
@@ -1373,20 +1343,10 @@ else
 				const angle = planet.userData.angle;
 				const semiMajorAxis = planetInfo.semiMajorAxis;
 				const semiMinorAxis = semiMajorAxis * Math.sqrt(1 - planetInfo.eccentricity * planetInfo.eccentricity);
-				const inclinationRad = ((planetInfo.orbitalInclination || 0) * Math.PI) / 180;
 				
-				// Calculate position on inclined orbit
-				let x = semiMajorAxis * Math.cos(angle);
-				let y = 0;
-				let z = semiMinorAxis * Math.sin(angle);
-				
-				// Apply inclination rotation
-				const yNew = y * Math.cos(inclinationRad) - z * Math.sin(inclinationRad);
-				const zNew = y * Math.sin(inclinationRad) + z * Math.cos(inclinationRad);
-				
-				planet.position.x = x;
-				planet.position.y = yNew;
-				planet.position.z = zNew;
+				planet.position.x = sunX + semiMajorAxis * Math.cos(angle);
+				planet.position.y = sunY + semiMinorAxis * Math.sin(angle);
+				planet.position.z = 0;
 				
 				planets.push(planet);
 				world.add(planet);
@@ -1414,9 +1374,9 @@ else
 		sceneOffset.x = sceneOffset.x + ((sceneOffsetTarget.x - sceneOffset.x) * falloff);
 		sceneOffset.y = sceneOffset.y + ((sceneOffsetTarget.y - sceneOffset.y) * falloff);
 
-		// Don't apply screen offset in 3D view - camera handles view
-		// world.position.x = sceneOffset.x;
-		// world.position.y = sceneOffset.y;
+		// set the world position to the offset
+		world.position.x = sceneOffset.x;
+		world.position.y = sceneOffset.y;
 
 		let wins = windowManager.getWindows();
 
@@ -1428,8 +1388,22 @@ else
 
 		// Update sun position and animations if it exists
 		if (sun && wins.length > 0) {
-			// Sun stays at origin in 3D view
-			sun.position.set(0, 0, 0);
+			let sunTargetX, sunTargetY;
+			
+			if (sunAbsolutePosition) {
+				// Use absolute position
+				sunTargetX = sunAbsolutePosition.x;
+				sunTargetY = sunAbsolutePosition.y;
+			} else {
+				// Default to center of first window
+				let firstWin = wins[0];
+				sunTargetX = firstWin.shape.x + (firstWin.shape.w * .5);
+				sunTargetY = firstWin.shape.y + (firstWin.shape.h * .5);
+			}
+			
+			// Smooth position update for sun
+			sun.position.x = sun.position.x + (sunTargetX - sun.position.x) * falloff;
+			sun.position.y = sun.position.y + (sunTargetY - sun.position.y) * falloff;
 			// sunGlow.position.x = sun.position.x;
 			// sunGlow.position.y = sun.position.y;
 			// sunCorona.position.x = sun.position.x;
@@ -1441,8 +1415,7 @@ else
 			if (sun.userData.label) {
 				sun.userData.label.position.x = sun.position.x;
 				sun.userData.label.position.y = sun.position.y + 90;
-				sun.userData.label.position.z = sun.position.z;
-				sun.userData.label.lookAt(camera.position);
+				sun.userData.label.position.z = 10;
 			}
 			
 			// Animate sun rotation
@@ -1510,7 +1483,11 @@ else
 			solarFlares.rotation.y = t * 0.01;
 			*/
 			
-			// Orbits stay at origin
+			// Update orbit positions to follow sun
+			orbits.forEach((orbit) => {
+				orbit.position.x = sun.position.x;
+				orbit.position.y = sun.position.y;
+			});
 			
 			// Update planet positions with orbital motion
 			planets.forEach((planet, index) => {
@@ -1524,20 +1501,10 @@ else
 				const angle = planet.userData.angle;
 				const semiMajorAxis = planetInfo.semiMajorAxis;
 				const semiMinorAxis = semiMajorAxis * Math.sqrt(1 - planetInfo.eccentricity * planetInfo.eccentricity);
-				const inclinationRad = ((planetInfo.orbitalInclination || 0) * Math.PI) / 180;
 				
-				// Calculate position on inclined elliptical orbit
-				let x = semiMajorAxis * Math.cos(angle);
-				let y = 0;
-				let z = semiMinorAxis * Math.sin(angle);
-				
-				// Apply inclination rotation
-				const yNew = y * Math.cos(inclinationRad) - z * Math.sin(inclinationRad);
-				const zNew = y * Math.sin(inclinationRad) + z * Math.cos(inclinationRad);
-				
-				planet.position.x = x;
-				planet.position.y = yNew;
-				planet.position.z = zNew;
+				// Calculate position on elliptical orbit
+				planet.position.x = sun.position.x + semiMajorAxis * Math.cos(angle);
+				planet.position.y = sun.position.y + semiMinorAxis * Math.sin(angle);
 				
 				// Rotate planet on its axis
 				const rotationSpeed = Math.abs(planetInfo.rotationPeriod) > 1 
@@ -1569,13 +1536,6 @@ else
 						child.rotation.z = -planet.rotation.z; // Keep rings horizontal relative to orbit
 					}
 				});
-				
-				// Update planet label position and orientation
-				if (planet.userData.label) {
-					planet.userData.label.position.copy(planet.position);
-					planet.userData.label.position.y += planetInfo.radius + 30;
-					planet.userData.label.lookAt(camera.position);
-				}
 			});
 		}
 
@@ -1588,9 +1548,9 @@ else
 	function resize ()
 	{
 		let width = window.innerWidth;
-		let height = window.innerHeight;
+		let height = window.innerHeight
 		
-		camera.aspect = width / height;
+		camera = new t.OrthographicCamera(0, width, 0, height, -10000, 10000);
 		camera.updateProjectionMatrix();
 		renderer.setSize( width, height );
 	}

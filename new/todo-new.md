@@ -98,27 +98,27 @@
 - [x] Blend với background
 
 ### 2.4 Sun Corona Layer 2 & 3
-- [ ] Additional corona layers
-- [ ] Different sizes và opacities
-- [ ] Phase-shifted animations
+- [x] Additional corona layers
+- [x] Different sizes và opacities
+- [x] Phase-shifted animations
 - [ ] Turbulence effects
-- [ ] Edge glow enhancement
-- [ ] Composite blending
+- [x] Edge glow enhancement
+- [x] Composite blending
 
 ### 2.5 Solar Flares System
-- [ ] Design flare particle geometry
-- [ ] Create emission points on surface
-- [ ] Implement arc trajectories
-- [ ] Random burst timing
-- [ ] Size và speed variations
-- [ ] Fade-out animations
+- [x] Design flare particle geometry
+- [x] Create emission points on surface
+- [x] Implement arc trajectories
+- [x] Random burst timing
+- [x] Size và speed variations
+- [x] Fade-out animations
 
 ### 2.6 Sun Rotation Animation
-- [ ] Implement Y-axis rotation
+- [x] Implement Y-axis rotation
 - [ ] Differential rotation rates
 - [ ] Surface feature tracking
-- [ ] Smooth rotation curves
-- [ ] Performance optimization
+- [x] Smooth rotation curves
+- [x] Performance optimization
 
 ### 2.7 Sun Glow Post-processing
 - [ ] Setup bloom effect

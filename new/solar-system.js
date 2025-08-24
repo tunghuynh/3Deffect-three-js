@@ -624,64 +624,57 @@ function createMilkyWay() {
     }
 }
 
+// Create sun texture (similar to main.js)
+function createSunTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+    
+    // Complex sun surface gradient
+    const gradient = ctx.createRadialGradient(
+        canvas.width/2, canvas.height/2, 0,
+        canvas.width/2, canvas.height/2, canvas.width/2
+    );
+    gradient.addColorStop(0, '#FFFF00');
+    gradient.addColorStop(0.2, '#FFD700');
+    gradient.addColorStop(0.4, '#FFA500');
+    gradient.addColorStop(0.6, '#FF8C00');
+    gradient.addColorStop(0.8, '#FF6347');
+    gradient.addColorStop(1, '#FF4500');
+    
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Add sunspots
+    for(let i = 0; i < 8; i++) {
+        const x = Math.random() * canvas.width;
+        const y = Math.random() * canvas.height;
+        const radius = Math.random() * 20 + 10;
+        const spotGrad = ctx.createRadialGradient(x, y, 0, x, y, radius);
+        spotGrad.addColorStop(0, 'rgba(100,50,0,0.8)');
+        spotGrad.addColorStop(1, 'rgba(200,100,0,0)');
+        ctx.fillStyle = spotGrad;
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+    return texture;
+}
+
 // Create the Sun
 function createSun() {
     // Sun core
     const sunGeometry = new THREE.SphereGeometry(60, 64, 64);
-    const sunMaterial = new THREE.ShaderMaterial({
-        uniforms: {
-            time: { value: 0 },
-            colorA: { value: new THREE.Color(0xFFD700) },
-            colorB: { value: new THREE.Color(0xFF8C00) },
-            colorC: { value: new THREE.Color(0xFF4500) }
-        },
-        vertexShader: `
-            varying vec3 vNormal;
-            varying vec3 vPosition;
-            uniform float time;
-            
-            // Noise function
-            float noise(vec3 p) {
-                return sin(p.x * 10.0 + time) * sin(p.y * 10.0 + time) * sin(p.z * 10.0 + time);
-            }
-            
-            void main() {
-                vNormal = normalize(normalMatrix * normal);
-                vPosition = position;
-                
-                // Add surface turbulence
-                vec3 pos = position;
-                float displacement = noise(position * 0.1) * 2.0;
-                pos += normal * displacement;
-                
-                gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
-            }
-        `,
-        fragmentShader: `
-            uniform float time;
-            uniform vec3 colorA;
-            uniform vec3 colorB;
-            uniform vec3 colorC;
-            varying vec3 vNormal;
-            varying vec3 vPosition;
-            
-            void main() {
-                // Create gradient based on position
-                float mixFactor = (vPosition.y + 60.0) / 120.0;
-                vec3 color = mix(colorC, mix(colorB, colorA, mixFactor), mixFactor);
-                
-                // Add surface variation
-                float noise = sin(vPosition.x * 0.05 + time) * sin(vPosition.z * 0.05 + time);
-                color = mix(color, colorB, noise * 0.3);
-                
-                // Emissive glow
-                float glow = pow(0.7 - dot(vNormal, vec3(0, 0, 1)), 2.0);
-                
-                gl_FragColor = vec4(color + vec3(glow * 0.5), 1.0);
-            }
-        `,
-        emissive: 0xFFD700,
-        emissiveIntensity: 2
+    const sunTexture = createSunTexture();
+    // Use MeshBasicMaterial similar to main.js for better compatibility
+    const sunMaterial = new THREE.MeshBasicMaterial({
+        map: sunTexture,
+        emissive: 0xFFAA00,
+        emissiveIntensity: 1
     });
     
     sun = new THREE.Mesh(sunGeometry, sunMaterial);
@@ -691,34 +684,12 @@ function createSun() {
     // Corona layers
     // Layer 1
     const glowGeometry1 = new THREE.SphereGeometry(80, 32, 32);
-    const glowMaterial1 = new THREE.ShaderMaterial({
-        uniforms: {
-            time: { value: 0 },
-            glowColor: { value: new THREE.Color(0xFFD700) },
-            intensity: { value: 0.5 }
-        },
-        vertexShader: `
-            varying vec3 vNormal;
-            void main() {
-                vNormal = normalize(normalMatrix * normal);
-                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-            }
-        `,
-        fragmentShader: `
-            uniform float time;
-            uniform vec3 glowColor;
-            uniform float intensity;
-            varying vec3 vNormal;
-            
-            void main() {
-                float glow = pow(0.5 - dot(vNormal, vec3(0, 0, 1)), 3.0);
-                float pulse = sin(time * 2.0) * 0.1 + 0.9;
-                gl_FragColor = vec4(glowColor, glow * intensity * pulse);
-            }
-        `,
+    const glowMaterial1 = new THREE.MeshBasicMaterial({
+        color: 0xFFD700,
+        transparent: true,
+        opacity: 0.3,
         side: THREE.BackSide,
         blending: THREE.AdditiveBlending,
-        transparent: true,
         depthWrite: false
     });
     
@@ -728,8 +699,14 @@ function createSun() {
     
     // Layer 2
     const glowGeometry2 = new THREE.SphereGeometry(100, 32, 32);
-    const glowMaterial2 = glowMaterial1.clone();
-    glowMaterial2.uniforms.intensity.value = 0.3;
+    const glowMaterial2 = new THREE.MeshBasicMaterial({
+        color: 0xFF8C00,
+        transparent: true,
+        opacity: 0.2,
+        side: THREE.BackSide,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+    });
     
     sunGlow2 = new THREE.Mesh(glowGeometry2, glowMaterial2);
     sunGlow2.position.copy(sunPosition);
@@ -737,8 +714,14 @@ function createSun() {
     
     // Layer 3
     const glowGeometry3 = new THREE.SphereGeometry(120, 32, 32);
-    const glowMaterial3 = glowMaterial1.clone();
-    glowMaterial3.uniforms.intensity.value = 0.2;
+    const glowMaterial3 = new THREE.MeshBasicMaterial({
+        color: 0xFF6347,
+        transparent: true,
+        opacity: 0.1,
+        side: THREE.BackSide,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+    });
     
     sunGlow3 = new THREE.Mesh(glowGeometry3, glowMaterial3);
     sunGlow3.position.copy(sunPosition);
@@ -758,51 +741,51 @@ function createSolarFlares() {
         const velocities = new Float32Array(flareCount * 3);
         const sizes = new Float32Array(flareCount);
         const lifetimes = new Float32Array(flareCount);
+        const colors = new Float32Array(flareCount * 3);
         
         // Initialize particles
         for (let j = 0; j < flareCount; j++) {
             resetFlareParticle(positions, velocities, sizes, lifetimes, j);
+            // Set initial colors (orange to yellow gradient)
+            colors[j * 3] = 1.0; // R
+            colors[j * 3 + 1] = 0.7 + Math.random() * 0.3; // G
+            colors[j * 3 + 2] = 0.0; // B
         }
         
         flareGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
         flareGeometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+        flareGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
         
-        // Custom shader for flares
-        const flareMaterial = new THREE.ShaderMaterial({
-            uniforms: {
-                time: { value: 0 },
-                texture: { value: new THREE.TextureLoader().load('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAFxJREFUeNpifP78OQMDAwMTAwMDSA7IZOAT+A8lkBXA2EyMjIz/GRn/I8sxQAUZIApAikAKYApgCkAKYApACkAKYApACkAKYApACmAKYApiCjBMG4aOgQcDBBgAmEMIaJcJq2UAAAAASUVORK5CYII=') },
-                baseColor: { value: new THREE.Color(0xFFD700) },
-                glowColor: { value: new THREE.Color(0xFF4500) }
-            },
-            vertexShader: `
-                attribute float size;
-                varying float vAlpha;
-                varying vec3 vColor;
-                uniform float time;
-                
-                void main() {
-                    vAlpha = size / 10.0;
-                    vColor = mix(vec3(1.0, 0.8, 0.0), vec3(1.0, 0.4, 0.0), sin(time + position.x));
-                    
-                    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-                    gl_PointSize = size * (300.0 / -mvPosition.z);
-                    gl_Position = projectionMatrix * mvPosition;
-                }
-            `,
-            fragmentShader: `
-                uniform sampler2D texture;
-                varying float vAlpha;
-                varying vec3 vColor;
-                
-                void main() {
-                    vec4 texColor = texture2D(texture, gl_PointCoord);
-                    gl_FragColor = vec4(vColor, vAlpha) * texColor;
-                }
-            `,
+        // Create texture for flares
+        const flareCanvas = document.createElement('canvas');
+        flareCanvas.width = 32;
+        flareCanvas.height = 32;
+        const flareCtx = flareCanvas.getContext('2d');
+        
+        // Create radial gradient for flare particle
+        const flareGrad = flareCtx.createRadialGradient(16, 16, 0, 16, 16, 16);
+        flareGrad.addColorStop(0, 'rgba(255,255,255,1)');
+        flareGrad.addColorStop(0.2, 'rgba(255,215,0,1)');
+        flareGrad.addColorStop(0.4, 'rgba(255,140,0,0.8)');
+        flareGrad.addColorStop(0.7, 'rgba(255,69,0,0.4)');
+        flareGrad.addColorStop(1, 'rgba(255,0,0,0)');
+        
+        flareCtx.fillStyle = flareGrad;
+        flareCtx.fillRect(0, 0, 32, 32);
+        
+        const flareTexture = new THREE.CanvasTexture(flareCanvas);
+        flareTexture.needsUpdate = true;
+        
+        // Simple point material for flares
+        const flareMaterial = new THREE.PointsMaterial({
+            map: flareTexture,
+            size: 8,
+            transparent: true,
+            opacity: 0.8,
             blending: THREE.AdditiveBlending,
-            depthTest: false,
-            transparent: true
+            depthWrite: false,
+            sizeAttenuation: true,
+            vertexColors: true
         });
         
         const flareSystem = new THREE.Points(flareGeometry, flareMaterial);
@@ -1009,364 +992,66 @@ function createPlanet(data, index) {
         };
     } else if (data.name === "Venus") {
         // Venus - thick yellowish atmosphere
-        material = new THREE.ShaderMaterial({
-            uniforms: {
-                time: { value: 0 },
-                atmosphereColor: { value: new THREE.Color(0xFFC649) },
-                surfaceColor: { value: new THREE.Color(0xE8B547) }
-            },
-            vertexShader: `
-                varying vec3 vNormal;
-                varying vec2 vUv;
-                void main() {
-                    vUv = uv;
-                    vNormal = normalize(normalMatrix * normal);
-                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-                }
-            `,
-            fragmentShader: `
-                uniform float time;
-                uniform vec3 atmosphereColor;
-                uniform vec3 surfaceColor;
-                varying vec3 vNormal;
-                varying vec2 vUv;
-                
-                float noise(vec2 p) {
-                    return sin(p.x * 10.0) * sin(p.y * 10.0);
-                }
-                
-                void main() {
-                    // Swirling cloud patterns
-                    vec2 uv = vUv;
-                    float clouds = noise(uv * 5.0 + vec2(time * 0.02, 0.0));
-                    clouds += noise(uv * 10.0 - vec2(0.0, time * 0.03)) * 0.5;
-                    clouds = smoothstep(0.0, 1.0, clouds * 0.5 + 0.5);
-                    
-                    vec3 color = mix(surfaceColor, atmosphereColor, clouds);
-                    
-                    // Atmospheric glow at edges
-                    float rim = 1.0 - dot(vNormal, vec3(0.0, 0.0, 1.0));
-                    color += atmosphereColor * pow(rim, 2.0) * 0.5;
-                    
-                    gl_FragColor = vec4(color, 1.0);
-                }
-            `
+        material = new THREE.MeshPhongMaterial({
+            color: 0xFFC649,
+            emissive: 0xE8B547,
+            emissiveIntensity: 0.1,
+            shininess: 20,
+            specular: 0x222222
         });
     } else if (data.name === "Earth") {
         // Earth - blue marble with continents
-        material = new THREE.ShaderMaterial({
-            uniforms: {
-                time: { value: 0 },
-                oceanColor: { value: new THREE.Color(0x006994) },
-                landColor: { value: new THREE.Color(0x2A5F1A) },
-                desertColor: { value: new THREE.Color(0xD2B48C) },
-                iceColor: { value: new THREE.Color(0xFFFFFF) }
-            },
-            vertexShader: `
-                varying vec3 vNormal;
-                varying vec2 vUv;
-                varying vec3 vPosition;
-                void main() {
-                    vUv = uv;
-                    vNormal = normalize(normalMatrix * normal);
-                    vPosition = position;
-                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-                }
-            `,
-            fragmentShader: `
-                uniform float time;
-                uniform vec3 oceanColor;
-                uniform vec3 landColor;
-                uniform vec3 desertColor;
-                uniform vec3 iceColor;
-                varying vec3 vNormal;
-                varying vec2 vUv;
-                varying vec3 vPosition;
-                
-                float noise(vec2 p) {
-                    return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
-                }
-                
-                void main() {
-                    vec2 uv = vUv;
-                    
-                    // Simple continent pattern
-                    float land = noise(uv * 4.0) * noise(uv * 8.0);
-                    land = smoothstep(0.3, 0.4, land);
-                    
-                    // Ice caps at poles
-                    float iceCap = smoothstep(0.7, 0.9, abs(vPosition.y) / 10.0);
-                    
-                    // Mix colors
-                    vec3 color = mix(oceanColor, landColor, land);
-                    color = mix(color, iceColor, iceCap);
-                    
-                    // Add specular for water
-                    float specular = pow(max(0.0, dot(vNormal, vec3(0.0, 0.0, 1.0))), 20.0);
-                    if(land < 0.5) color += vec3(specular * 0.5);
-                    
-                    // Atmosphere effect
-                    float rim = 1.0 - dot(vNormal, vec3(0.0, 0.0, 1.0));
-                    color += vec3(0.1, 0.3, 0.6) * pow(rim, 2.0) * 0.3;
-                    
-                    gl_FragColor = vec4(color, 1.0);
-                }
-            `
+        material = new THREE.MeshPhongMaterial({
+            color: 0x2E6FFF,
+            emissive: 0x112288,
+            emissiveIntensity: 0.1,
+            shininess: 50,
+            specular: 0x222222
         });
     } else if (data.name === "Mars") {
         // Mars - red planet with polar caps
-        material = new THREE.ShaderMaterial({
-            uniforms: {
-                time: { value: 0 },
-                baseColor: { value: new THREE.Color(0xCD5C5C) },
-                darkColor: { value: new THREE.Color(0x8B3626) },
-                iceColor: { value: new THREE.Color(0xF0E6DC) }
-            },
-            vertexShader: `
-                varying vec3 vNormal;
-                varying vec2 vUv;
-                varying vec3 vPosition;
-                void main() {
-                    vUv = uv;
-                    vNormal = normalize(normalMatrix * normal);
-                    vPosition = position;
-                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-                }
-            `,
-            fragmentShader: `
-                uniform float time;
-                uniform vec3 baseColor;
-                uniform vec3 darkColor;
-                uniform vec3 iceColor;
-                varying vec3 vNormal;
-                varying vec2 vUv;
-                varying vec3 vPosition;
-                
-                float noise(vec2 p) {
-                    return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
-                }
-                
-                void main() {
-                    vec2 uv = vUv;
-                    
-                    // Surface features
-                    float features = noise(uv * 10.0) * noise(uv * 20.0);
-                    vec3 color = mix(baseColor, darkColor, features);
-                    
-                    // Polar ice caps
-                    float iceCap = smoothstep(0.8, 0.95, abs(vPosition.y) / 5.3);
-                    color = mix(color, iceColor, iceCap);
-                    
-                    // Dust atmosphere
-                    float rim = 1.0 - dot(vNormal, vec3(0.0, 0.0, 1.0));
-                    color += baseColor * pow(rim, 3.0) * 0.2;
-                    
-                    gl_FragColor = vec4(color, 1.0);
-                }
-            `
+        material = new THREE.MeshPhongMaterial({
+            color: 0xCD5C5C,
+            emissive: 0x8B3626,
+            emissiveIntensity: 0.1,
+            shininess: 15,
+            specular: 0x111111
         });
     } else if (data.name === "Jupiter") {
         // Jupiter with Great Red Spot and bands
-        material = new THREE.ShaderMaterial({
-            uniforms: {
-                time: { value: 0 },
-                bandColor1: { value: new THREE.Color(0xE8D4A2) },
-                bandColor2: { value: new THREE.Color(0xC4915C) },
-                bandColor3: { value: new THREE.Color(0x8B6F47) },
-                stormColor: { value: new THREE.Color(0xCD5C5C) }
-            },
-            vertexShader: `
-                varying vec2 vUv;
-                varying vec3 vPosition;
-                void main() {
-                    vUv = uv;
-                    vPosition = position;
-                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-                }
-            `,
-            fragmentShader: `
-                uniform float time;
-                uniform vec3 bandColor1;
-                uniform vec3 bandColor2;
-                uniform vec3 bandColor3;
-                uniform vec3 stormColor;
-                varying vec2 vUv;
-                varying vec3 vPosition;
-                
-                float noise(vec2 p) {
-                    return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
-                }
-                
-                void main() {
-                    vec2 uv = vUv;
-                    
-                    // Animated bands
-                    float bands = sin((uv.y + time * 0.01) * 30.0) * 0.5 + 0.5;
-                    float turbulence = noise(vec2(uv.x * 20.0 + time * 0.02, uv.y * 10.0)) * 0.2;
-                    bands += turbulence;
-                    
-                    vec3 color = mix(bandColor1, bandColor2, bands);
-                    color = mix(color, bandColor3, smoothstep(0.3, 0.7, bands));
-                    
-                    // Great Red Spot
-                    vec2 spotCenter = vec2(0.3, 0.4);
-                    float spotDist = distance(uv, spotCenter);
-                    if(spotDist < 0.08) {
-                        float spotIntensity = 1.0 - smoothstep(0.0, 0.08, spotDist);
-                        float swirl = sin(spotDist * 50.0 - time * 2.0) * 0.5 + 0.5;
-                        color = mix(color, stormColor, spotIntensity * swirl);
-                    }
-                    
-                    gl_FragColor = vec4(color, 1.0);
-                }
-            `
+        material = new THREE.MeshPhongMaterial({
+            color: 0xD4A76A,
+            emissive: 0x8B6F47,
+            emissiveIntensity: 0.1,
+            shininess: 30,
+            specular: 0x222222
         });
     } else if (data.name === "Saturn") {
         // Saturn - pale gold with subtle bands
-        material = new THREE.ShaderMaterial({
-            uniforms: {
-                time: { value: 0 },
-                baseColor: { value: new THREE.Color(0xFAD5A5) },
-                bandColor: { value: new THREE.Color(0xE8C88C) }
-            },
-            vertexShader: `
-                varying vec2 vUv;
-                varying vec3 vNormal;
-                void main() {
-                    vUv = uv;
-                    vNormal = normalize(normalMatrix * normal);
-                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-                }
-            `,
-            fragmentShader: `
-                uniform float time;
-                uniform vec3 baseColor;
-                uniform vec3 bandColor;
-                varying vec2 vUv;
-                varying vec3 vNormal;
-                
-                void main() {
-                    vec2 uv = vUv;
-                    
-                    // Subtle bands
-                    float bands = sin(uv.y * 20.0) * 0.5 + 0.5;
-                    vec3 color = mix(baseColor, bandColor, bands * 0.3);
-                    
-                    // Hexagonal storm at north pole (simplified)
-                    if(uv.y > 0.9) {
-                        color *= 0.9;
-                    }
-                    
-                    // Soft glow
-                    float rim = 1.0 - dot(vNormal, vec3(0.0, 0.0, 1.0));
-                    color += baseColor * pow(rim, 3.0) * 0.1;
-                    
-                    gl_FragColor = vec4(color, 1.0);
-                }
-            `
+        material = new THREE.MeshPhongMaterial({
+            color: 0xFAD5A5,
+            emissive: 0xE8C88C,
+            emissiveIntensity: 0.08,
+            shininess: 35,
+            specular: 0x333333
         });
     } else if (data.name === "Uranus") {
         // Uranus - pale blue-green
-        material = new THREE.ShaderMaterial({
-            uniforms: {
-                time: { value: 0 },
-                baseColor: { value: new THREE.Color(0x4FD0E0) },
-                cloudColor: { value: new THREE.Color(0x7FDBEF) }
-            },
-            vertexShader: `
-                varying vec2 vUv;
-                varying vec3 vNormal;
-                void main() {
-                    vUv = uv;
-                    vNormal = normalize(normalMatrix * normal);
-                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-                }
-            `,
-            fragmentShader: `
-                uniform float time;
-                uniform vec3 baseColor;
-                uniform vec3 cloudColor;
-                varying vec2 vUv;
-                varying vec3 vNormal;
-                
-                float noise(vec2 p) {
-                    return fract(sin(dot(p, vec2(45.234, 98.882))) * 43758.5453);
-                }
-                
-                void main() {
-                    vec2 uv = vUv;
-                    
-                    // Subtle cloud patterns
-                    float clouds = noise(uv * 8.0 + time * 0.01);
-                    vec3 color = mix(baseColor, cloudColor, clouds * 0.2);
-                    
-                    // Atmospheric haze
-                    float rim = 1.0 - dot(vNormal, vec3(0.0, 0.0, 1.0));
-                    color += cloudColor * pow(rim, 2.0) * 0.3;
-                    
-                    gl_FragColor = vec4(color, 1.0);
-                }
-            `
+        material = new THREE.MeshPhongMaterial({
+            color: 0x4FD0E0,
+            emissive: 0x276873,
+            emissiveIntensity: 0.1,
+            shininess: 40,
+            specular: 0x444444
         });
     } else if (data.name === "Neptune") {
         // Neptune - deep blue with storm features
-        material = new THREE.ShaderMaterial({
-            uniforms: {
-                time: { value: 0 },
-                baseColor: { value: new THREE.Color(0x3A5FCD) },
-                stormColor: { value: new THREE.Color(0x1E3A8A) },
-                cloudColor: { value: new THREE.Color(0x6495ED) }
-            },
-            vertexShader: `
-                varying vec2 vUv;
-                varying vec3 vNormal;
-                void main() {
-                    vUv = uv;
-                    vNormal = normalize(normalMatrix * normal);
-                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-                }
-            `,
-            fragmentShader: `
-                uniform float time;
-                uniform vec3 baseColor;
-                uniform vec3 stormColor;
-                uniform vec3 cloudColor;
-                varying vec2 vUv;
-                varying vec3 vNormal;
-                
-                float noise(vec2 p) {
-                    return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
-                }
-                
-                void main() {
-                    vec2 uv = vUv;
-                    
-                    // Base color with variations
-                    vec3 color = baseColor;
-                    
-                    // Cloud bands
-                    float bands = sin(uv.y * 15.0 + time * 0.02) * 0.5 + 0.5;
-                    color = mix(color, cloudColor, bands * 0.3);
-                    
-                    // Great Dark Spot
-                    vec2 spotCenter = vec2(0.6, 0.5);
-                    float spotDist = distance(uv, spotCenter);
-                    if(spotDist < 0.06) {
-                        float intensity = 1.0 - smoothstep(0.0, 0.06, spotDist);
-                        color = mix(color, stormColor, intensity * 0.7);
-                    }
-                    
-                    // Wind streaks
-                    float streaks = noise(vec2(uv.x * 30.0 + time * 0.05, uv.y));
-                    color = mix(color, cloudColor, streaks * 0.1);
-                    
-                    // Atmosphere
-                    float rim = 1.0 - dot(vNormal, vec3(0.0, 0.0, 1.0));
-                    color += baseColor * pow(rim, 2.0) * 0.2;
-                    
-                    gl_FragColor = vec4(color, 1.0);
-                }
-            `
+        material = new THREE.MeshPhongMaterial({
+            color: 0x4B70DD,
+            emissive: 0x25386E,
+            emissiveIntensity: 0.1,
+            shininess: 45,
+            specular: 0x333333
         });
     } else {
         // Default planet material
@@ -1422,58 +1107,44 @@ function createPlanet(data, index) {
                 uvs[i + 1] = Math.sin(angle) * 0.5 + 0.5;
             }
             
-            // Create ring material with procedural texture
-            const ringMaterial = new THREE.ShaderMaterial({
-                uniforms: {
-                    time: { value: 0 },
-                    baseColor: { value: new THREE.Color(ring.color) },
-                    innerRadius: { value: ring.inner },
-                    outerRadius: { value: ring.outer }
-                },
-                vertexShader: `
-                    varying vec2 vUv;
-                    varying float vRadius;
-                    void main() {
-                        vUv = uv;
-                        vRadius = length(position.xy);
-                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-                    }
-                `,
-                fragmentShader: `
-                    uniform float time;
-                    uniform vec3 baseColor;
-                    uniform float innerRadius;
-                    uniform float outerRadius;
-                    varying vec2 vUv;
-                    varying float vRadius;
-                    
-                    float random(vec2 st) {
-                        return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453);
-                    }
-                    
-                    void main() {
-                        // Create concentric ring pattern
-                        float ringPattern = sin(vRadius * 200.0) * 0.5 + 0.5;
-                        
-                        // Add radial variation
-                        float angle = atan(vUv.y - 0.5, vUv.x - 0.5);
-                        float radialNoise = random(vec2(angle * 10.0, vRadius)) * 0.3;
-                        
-                        // Fade edges
-                        float edgeFade = smoothstep(innerRadius, innerRadius + 2.0, vRadius) * 
-                                        smoothstep(outerRadius, outerRadius - 2.0, vRadius);
-                        
-                        // Combine patterns
-                        vec3 color = baseColor * (0.7 + ringPattern * 0.3 + radialNoise);
-                        float alpha = ` + ring.opacity + ` * edgeFade * (0.8 + ringPattern * 0.2);
-                        
-                        gl_FragColor = vec4(color, alpha);
-                    }
-                `,
+            // Create ring material with simple texture
+            const ringCanvas = document.createElement('canvas');
+            ringCanvas.width = 256;
+            ringCanvas.height = 16;
+            const ringCtx = ringCanvas.getContext('2d');
+            
+            // Create gradient for ring texture
+            const ringGrad = ringCtx.createLinearGradient(0, 0, ringCanvas.width, 0);
+            const baseColorHex = '#' + ring.color.toString(16).padStart(6, '0');
+            ringGrad.addColorStop(0, baseColorHex + '80');
+            ringGrad.addColorStop(0.3, baseColorHex + 'CC');
+            ringGrad.addColorStop(0.5, baseColorHex + 'FF');
+            ringGrad.addColorStop(0.7, baseColorHex + 'CC');
+            ringGrad.addColorStop(1, baseColorHex + '80');
+            
+            ringCtx.fillStyle = ringGrad;
+            ringCtx.fillRect(0, 0, ringCanvas.width, ringCanvas.height);
+            
+            // Add some noise
+            for(let i = 0; i < 100; i++) {
+                ringCtx.fillStyle = `rgba(255,255,255,${Math.random() * 0.1})`;
+                ringCtx.fillRect(Math.random() * ringCanvas.width, Math.random() * ringCanvas.height, 1, 1);
+            }
+            
+            const ringTexture = new THREE.CanvasTexture(ringCanvas);
+            ringTexture.needsUpdate = true;
+            
+            const ringMaterial = new THREE.MeshPhongMaterial({
+                map: ringTexture,
+                color: ring.color,
                 side: THREE.DoubleSide,
                 transparent: true,
-                depthWrite: false,
-                blending: THREE.NormalBlending
+                opacity: ring.opacity,
+                shininess: 50,
+                specular: 0x222222,
+                emissive: ring.color,
+                emissiveIntensity: 0.05,
+                depthWrite: false
             });
             
             const ringMesh = new THREE.Mesh(ringGeometry, ringMaterial);
@@ -1610,23 +1281,26 @@ function animate() {
     // Update sun and corona positions
     if (sun) {
         sun.position.copy(sunPosition);
-        sun.material.uniforms.time.value = elapsedTime;
         sun.rotation.y += 0.001;
     }
     
     if (sunGlow1) {
         sunGlow1.position.copy(sunPosition);
-        sunGlow1.material.uniforms.time.value = elapsedTime;
+        // Animate glow with pulsing effect
+        const glowScale = 1 + Math.sin(elapsedTime * 2) * 0.05;
+        sunGlow1.scale.set(glowScale, glowScale, glowScale);
     }
     
     if (sunGlow2) {
         sunGlow2.position.copy(sunPosition);
-        sunGlow2.material.uniforms.time.value = elapsedTime;
+        const glowScale2 = 1 + Math.sin(elapsedTime * 1.5) * 0.03;
+        sunGlow2.scale.set(glowScale2, glowScale2, glowScale2);
     }
     
     if (sunGlow3) {
         sunGlow3.position.copy(sunPosition);
-        sunGlow3.material.uniforms.time.value = elapsedTime;
+        const glowScale3 = 1 + Math.sin(elapsedTime * 1) * 0.02;
+        sunGlow3.scale.set(glowScale3, glowScale3, glowScale3);
     }
     
     // Update sun light position
@@ -1688,10 +1362,7 @@ function animate() {
         flareSystem.geometry.attributes.position.needsUpdate = true;
         flareSystem.geometry.attributes.size.needsUpdate = true;
         
-        // Update shader uniforms
-        if (flareSystem.material.uniforms) {
-            flareSystem.material.uniforms.time.value = elapsedTime;
-        }
+        // Flare material doesn't need time update anymore
     });
     
     // Animate stars
@@ -1736,9 +1407,9 @@ function animate() {
         // Rotation
         planet.mesh.rotation.y += planet.data.rotationSpeed;
         
-        // Special animations
-        if (planet.data.name === "Jupiter" && planet.mesh.material.uniforms) {
-            planet.mesh.material.uniforms.time.value = elapsedTime;
+        // Special animations for Jupiter (Great Red Spot)
+        if (planet.data.name === "Jupiter") {
+            // Rotation is already handled above
         }
         
         if (planet.clouds) {
@@ -1747,14 +1418,6 @@ function animate() {
         
         if (planet.rings) {
             // Animate ring rotation
-            if (planet.data.name === "Saturn") {
-                // Update shader uniforms for each ring
-                planet.rings.children.forEach(ring => {
-                    if (ring.material && ring.material.uniforms) {
-                        ring.material.uniforms.time.value = elapsedTime;
-                    }
-                });
-            }
             planet.rings.rotation.z += 0.0002;
         }
     });
